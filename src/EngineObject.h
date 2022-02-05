@@ -10,11 +10,11 @@ struct ObjectInfo_t {
 class EngineObject {
 public:
 
-	ObjectInfo_t* objectInfo;
+	unsigned int objectInfoIndex;
 
-	EngineObject(ObjectInfo_t* objectInfo_ = nullptr) : objectInfo(objectInfo_) {}
+	EngineObject(unsigned int objectInfoIndex_ = 0) : objectInfoIndex(objectInfoIndex_) {}
 
-	~EngineObject() { objectInfo = nullptr; }
+	~EngineObject() { }
 };
 
 #endif

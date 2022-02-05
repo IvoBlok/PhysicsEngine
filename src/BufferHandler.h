@@ -22,7 +22,6 @@ public:
 	EngineObject* engineObjects = new EngineObject[0];
 
 	BufferHandler(Camera& camera_) : camera(camera_) {
-		delete[] vertices, indices;
 		vertices = new float[INITIAL_VERTEX_BUFFER_CAPACITY];
 		indices = new unsigned int[INITIAL_INDEX_BUFFER_CAPACITY];
         objectInfo = new ObjectInfo_t[INITIAL_OBJECT_CAPACITY];
@@ -43,17 +42,25 @@ public:
 		std::vector<Mesh>    meshes;
 		std::string directory;
 
+        if (meshes.size() > 1) { std::cout << "ERROR::OBJECTS WITH MULTIPLE MESHES ARE NOT SUPPORTED YET! " << std::endl; return; }
+
         loadModel(path, directory, meshes);
-        for (size_t i = 0; i < meshes.size(); i++)
-        {
-            addToArrays(meshes[i]);
-        }
+        std::vector<int> indices = addToArrays(meshes[0]);
+
         // Update the object and objectinfo arrays
+        EngineObject object_ = EngineObject{};
+        ObjectInfo_t objectInfo_ = ObjectInfo_t{};
+        objectInfo_.indices[0] = indices[0];
+        objectInfo_.indices[1] = indices[1];
+        objectInfo_.color = glm::vec4(color, 0);
+        objectInfo_.geometryMatrix = glm::translate(objectInfo_.geometryMatrix, position);
+
+        addObjectData(objectInfo_, object_);
 
         updateBuffers();
 
         // return the new engine object
-
+        return object_;
 	};
 
 	// function responsible for updating the buffers with the current data held in 'vertices', 'indices' and 'objectInfo'
@@ -63,11 +70,13 @@ public:
 	void draw() {};
 
 private:
-	int vertexCount, indexCount, objectCount;
+	unsigned int vertexCount, indexCount, objectCount;
     int vertexCapacity = INITIAL_VERTEX_BUFFER_CAPACITY; int indexCapacity = INITIAL_INDEX_BUFFER_CAPACITY; int objectCapacity = INITIAL_OBJECT_CAPACITY;
 	Camera& camera;
 
-    void addToArrays(Mesh& mesh) {
+    std::vector<int> addToArrays(Mesh& mesh) {
+        std::vector<int> returnValues;
+
         //TODO: IMPLEMENT SYSTEM TO CHECK IF THE NEW VERTICES AREN'T ALREADY IN THE VERTEX BUFFER, IF SO THE INDICES CORRESPONDING TO THAT VERTEX NEED TO BE CHANGED
         float* tempVertices;
         unsigned int* tempIndices;
@@ -87,8 +96,11 @@ private:
             }
             delete[] vertices;
             vertices = tempVertices;
-
+            tempVertices = nullptr;
         }
+        //! All vertices of an object need to be besides each other
+        returnValues.push_back(vertexCount); // This will be the index to the first vertex in the new object
+        returnValues.push_back(vertexCount + newVertexValuesCount - 1); // This will be the index to the last vertex of the new object
         // Copy over the new values
         for (int i = vertexCount; i < vertexCount + newVertexValuesCount; i += 3) // go over every position with an increase of 3 every cycle to make the indexing easier
         {
@@ -110,6 +122,7 @@ private:
             }
             delete[] indices;
             indices = tempIndices;
+            tempIndices = nullptr;
         }
         // Copy over the new values
         for (int i = indexCount; i < indexCount + newIndexValuesCount; i++) // go over every index value
@@ -119,7 +132,36 @@ private:
         // Update the new Count
         indexCount += newIndexValuesCount;
         vertexCount += newVertexValuesCount;
+
+        return returnValues;
     };
+
+    void addObjectData(ObjectInfo_t& objectInfo_, EngineObject& object) {
+        ObjectInfo_t* tempObjectInfo;
+        EngineObject* tempEngineObjects;
+
+        if (objectCount + 1 > objectCapacity) {
+            objectCapacity *= 2;
+            tempObjectInfo = new ObjectInfo_t[objectCapacity];
+            tempEngineObjects = new EngineObject[objectCapacity];
+            for (int i = 0; i < objectCount; i++)
+            {
+                tempObjectInfo[i] = objectInfo[i];
+                tempEngineObjects[i] = engineObjects[i];
+            }
+            delete[] objectInfo;
+            delete[] engineObjects;
+            objectInfo = tempObjectInfo;
+            engineObjects = tempEngineObjects;
+
+            tempObjectInfo = nullptr;
+            tempEngineObjects = nullptr;
+        }
+        objectInfo[objectCount] = objectInfo_;
+        engineObjects[objectCount] = object;
+        object.objectInfoIndex = objectCount;
+        objectCount++;
+    }
 
     // loads a model with supported ASSIMP extensions from file and stores the resulting meshes in the meshes vector.
     void loadModel(std::string const& path, std::string& directory, std::vector<Mesh>& meshes)
