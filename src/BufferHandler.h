@@ -13,15 +13,19 @@
 #include "EngineObject.h"
 #include "Mesh.h"
 
+//TODO: Would be nicer if the presets were kept in an external file instead of inside the code
+//TODO: 
 class BufferHandler {
 public:
 	float* vertices = new float[0];
 	unsigned int* indices = new unsigned int[0];
+    
+    unsigned int vertexCount, indexCount, objectCount;
 
 	ObjectInfo_t* objectInfo = new ObjectInfo_t[0];
 	EngineObject* engineObjects = new EngineObject[0];
 
-	BufferHandler(Camera& camera_) : camera(camera_) {
+	BufferHandler(Camera& camera_, Shader& shader_) : camera(camera_), shader(shader_) {
 		vertices = new float[INITIAL_VERTEX_BUFFER_CAPACITY];
 		indices = new unsigned int[INITIAL_INDEX_BUFFER_CAPACITY];
         objectInfo = new ObjectInfo_t[INITIAL_OBJECT_CAPACITY];
@@ -30,49 +34,114 @@ public:
 		vertexCount = indexCount = objectCount = 0;
 	};
 
-    ~BufferHandler() {
-        if (vertices) delete[] vertices;
-        if (indices) delete[] indices;
-        if (objectInfo) delete[] objectInfo;
-        if (engineObjects) delete[] engineObjects;
-    }
-
 	// function responsible for creating a new engine object, loading the model data, classifying it as instanced or not and updating the buffers
-	EngineObject& createEngineObject(const char* path, glm::vec3 position = glm::vec3(0.f), glm::vec3 color = glm::vec3(1.f)) {
-		std::vector<Mesh>    meshes;
-		std::string directory;
+	unsigned int createEngineObject(std::string objectType, glm::vec3 position = glm::vec3(0.f), glm::vec3 color = glm::vec3(1.f)) {
 
-        if (meshes.size() > 1) { std::cout << "ERROR::OBJECTS WITH MULTIPLE MESHES ARE NOT SUPPORTED YET! " << std::endl; return; }
+        Mesh mesh = getPrimaryShapeMesh(objectType);
+        if (mesh.vertices.size() == 0) { return NULL; }
 
-        loadModel(path, directory, meshes);
-        std::vector<int> indices = addToArrays(meshes[0]);
-
+        addObjectDataSlot();
+        std::vector<int> indices = addToArrays(mesh);
+        
         // Update the object and objectinfo arrays
-        EngineObject object_ = EngineObject{};
-        ObjectInfo_t objectInfo_ = ObjectInfo_t{};
-        objectInfo_.indices[0] = indices[0];
-        objectInfo_.indices[1] = indices[1];
-        objectInfo_.color = glm::vec4(color, 0);
-        objectInfo_.geometryMatrix = glm::translate(objectInfo_.geometryMatrix, position);
+        objectInfo[objectCount - 1].indices = glm::vec4(indices[0], indices[1], indices[2], indices[3]);
+        objectInfo[objectCount - 1].color = glm::vec4(color, 0);
+        objectInfo[objectCount - 1].geometryMatrix = glm::translate(objectInfo[objectCount - 1].geometryMatrix, position);
 
-        addObjectData(objectInfo_, object_);
+        engineObjects[objectCount - 1].objectInfoIndex = objectCount - 1;
 
         updateBuffers();
-
+        
         // return the new engine object
-        return object_;
+        return objectCount - 1;
 	};
 
-	// function responsible for updating the buffers with the current data held in 'vertices', 'indices' and 'objectInfo'
-	void updateBuffers() {};
-
 	// function responsible for executing the sorted draw operations. a potentially large list of instanced draw calls and a final draw call for the leftovers
-	void draw() {};
+	void updateBuffers() {
+        glGenVertexArrays(1, &VAO);
+        glGenBuffers(1, &VBO);
+        glGenBuffers(1, &EBO);
+        // bind the Vertex Array Object first, then bind and set vertex buffer(s), and then configure vertex attributes(s).
+        glBindVertexArray(VAO);
+
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(float) * vertexCount, vertices, GL_STATIC_DRAW);
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * indexCount, indices, GL_STATIC_DRAW);
+
+        // position attribute
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
+
+        //configure the uniform buffer objects
+        // ---------------------------------
+        // first. We get the relevant block indices
+        unsigned int uniformBlockIndexMatrices = glGetUniformBlockIndex(shader.ID, "Matrices");
+        // then we link each shader's uniform block to this uniform binding point
+        glUniformBlockBinding(shader.ID, uniformBlockIndexMatrices, 0);
+        // Now actually create the buffer
+        glGenBuffers(1, &UBO);
+        glBindBuffer(GL_UNIFORM_BUFFER, UBO);
+        glBufferData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), NULL, GL_STATIC_DRAW);
+        glBindBuffer(GL_UNIFORM_BUFFER, 0);
+        // define the range of the buffer that links to a uniform binding point
+        glBindBufferRange(GL_UNIFORM_BUFFER, 0, UBO, 0, 2 * sizeof(glm::mat4));
+
+        // calculate projection matrix
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+
+        // store the projection matrix
+        glBindBuffer(GL_UNIFORM_BUFFER, UBO);
+        glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection));
+        glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
+        //configure the storage buffer objects
+        // ---------------------------------
+        unsigned int SSBO;
+        glGenBuffers(1, &SSBO);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, SSBO);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(ObjectInfo_t) * objectCount, objectInfo, GL_DYNAMIC_COPY);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, SSBO);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    };
+
+    void draw() {
+        glm::mat4 view = camera.GetViewMatrix();
+        glBindBuffer(GL_UNIFORM_BUFFER, UBO);
+        glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
+        glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
+        shader.setVec3("viewPos", camera.Position);
+
+        // render boxes
+        glBindVertexArray(VAO);
+        
+        //ourShader.setBool("instancing", true);
+        //glDrawElementsInstanced(GL_TRIANGLES, (GLsizei)(sizeof(indices) / sizeof(*indices)), GL_UNSIGNED_INT, 0, (GLsizei)(sizeof(cubePositions) / sizeof(*cubePositions)));
+        
+        glDrawElements(GL_TRIANGLES, (GLsizei)indexCount, GL_UNSIGNED_INT, 0);
+    }
+
+    ~BufferHandler() {
+        glDeleteVertexArrays(1, &VAO);
+        glDeleteBuffers(1, &VBO);
+        glDeleteBuffers(1, &EBO);
+        glDeleteBuffers(1, &UBO);
+
+        /* I got no clue why this gives a 'break' error
+        delete[] vertices;
+        delete[] indices;
+        delete[] objectInfo;
+        delete[] engineObjects;
+        */
+    }
 
 private:
-	unsigned int vertexCount, indexCount, objectCount;
     int vertexCapacity = INITIAL_VERTEX_BUFFER_CAPACITY; int indexCapacity = INITIAL_INDEX_BUFFER_CAPACITY; int objectCapacity = INITIAL_OBJECT_CAPACITY;
 	Camera& camera;
+    Shader& shader;
+    unsigned int VBO, EBO, VAO, UBO;
 
     std::vector<int> addToArrays(Mesh& mesh) {
         std::vector<int> returnValues;
@@ -81,16 +150,17 @@ private:
         float* tempVertices;
         unsigned int* tempIndices;
 
-        int newIndexValuesCount = mesh.indices.size();
-        int newVertexValuesCount = mesh.vertices.size() * 3;
+        int newIndexValuesCount = (int)mesh.indices.size();
+        int newVertexValuesCount = (int)mesh.vertices.size() * 3; // multiply by 3 to compensate for the fact that mesh.vertices is stored as a vec3, and bufferhandler vertices in float array
 
         // Vertices
         // ==================================
         // If the max capacity of the array has been reached, update the array to be longer and copy over the old values
-        if (vertexCount + newVertexValuesCount > vertexCapacity) {
+        if ((int)vertexCount + newVertexValuesCount > vertexCapacity) {
+            std::cout << "vertex capacity reached" << std::endl;
             vertexCapacity *= 2;
             tempVertices = new float[vertexCapacity];
-            for (int i = 0; i < vertexCount; i++)
+            for (int i = 0; i < (int)vertexCount; i++)
             {
                 tempVertices[i] = vertices[i];
             }
@@ -99,24 +169,27 @@ private:
             tempVertices = nullptr;
         }
         //! All vertices of an object need to be besides each other
-        returnValues.push_back(vertexCount); // This will be the index to the first vertex in the new object
-        returnValues.push_back(vertexCount + newVertexValuesCount - 1); // This will be the index to the last vertex of the new object
+        returnValues.push_back(vertexCount / 3); // This will be the index to the first vertex in the new object
+        returnValues.push_back((vertexCount + newVertexValuesCount) / 3 - 1); // This will be the index to the last vertex of the new object
         // Copy over the new values
-        for (int i = vertexCount; i < vertexCount + newVertexValuesCount; i += 3) // go over every position with an increase of 3 every cycle to make the indexing easier
+
+        for (int i = vertexCount; i < (int)vertexCount + newVertexValuesCount; i += 3) // go over every position with an increase of 3 every cycle to make the indexing easier
         {
             for (int j = 0; j < 3; j++)
             {
-                vertices[i + j] = mesh.vertices[(size_t)i - (size_t)vertexCount].position[j];
+               // std::cout << i + j << " : " << i - vertexCount << " " << j << std::endl;
+                vertices[i + j] = mesh.vertices[((size_t)i - (size_t)vertexCount)/3][j];
             }
         }
 
         // Indices
         // ==================================
         // If the max capacity of the array has been reached, update the array to be longer and copy over the old values
-        if (indexCount + newIndexValuesCount > indexCapacity) {
+        if ((int)indexCount + newIndexValuesCount > indexCapacity) {
+            std::cout << "index capacity reached" << std::endl;
             indexCapacity *= 2;
             tempIndices = new unsigned int[indexCapacity];
-            for (int i = 0; i < indexCount; i++)
+            for (int i = 0; i < (int)indexCount; i++)
             {
                 tempIndices[i] = indices[i];
             }
@@ -125,10 +198,13 @@ private:
             tempIndices = nullptr;
         }
         // Copy over the new values
-        for (int i = indexCount; i < indexCount + newIndexValuesCount; i++) // go over every index value
+        for (int i = indexCount; i < (int)indexCount + newIndexValuesCount; i++) // go over every index value
         {
-            indices[i] = mesh.indices[(size_t)i - (size_t)indexCount] + vertexCount; // the old VertexCount is added cause THE INDEX THAT IS WRITTEN TO THE INDEX BUFFER NEEDS TO BE UPDATED, AS THE VERTICES THEY WERE REFERRING TO DONT (HAVE TO) START AT INDEX 0
+            indices[i] = mesh.indices[(size_t)i - (size_t)indexCount] + vertexCount/3; // the old VertexCount is added cause THE INDEX THAT IS WRITTEN TO THE INDEX BUFFER NEEDS TO BE UPDATED, AS THE VERTICES THEY WERE REFERRING TO DONT (HAVE TO) START AT INDEX 0
         }
+
+        returnValues.push_back(indexCount); // This will be the index to the first vertex in the new object
+        returnValues.push_back(indexCount + newIndexValuesCount - 1); // This will be the index to the last vertex of the new object
         // Update the new Count
         indexCount += newIndexValuesCount;
         vertexCount += newVertexValuesCount;
@@ -136,15 +212,57 @@ private:
         return returnValues;
     };
 
-    void addObjectData(ObjectInfo_t& objectInfo_, EngineObject& object) {
+    //TODO: KEEP THESE PRESETS IN A FILE INSTEAD OF IN THE CODE ITSELF
+    Mesh getPrimaryShapeMesh(std::string type) {
+        if (type == "cube") {
+            std::vector<float> vertices = {
+                // positions      
+                 0.5f,  0.5f, -0.5f,
+                 0.5f, -0.5f, -0.5f,
+                -0.5f, -0.5f, -0.5f,
+                -0.5f,  0.5f, -0.5f,
+
+                 0.5f,  0.5f,  0.5f,
+                 0.5f, -0.5f,  0.5f,
+                -0.5f, -0.5f,  0.5f,
+                -0.5f,  0.5f,  0.5f,
+            };
+
+            std::vector<unsigned int> indices = {
+                3, 1, 0, // back side
+                3, 2, 1,
+
+                4, 5, 7, // front side
+                5, 6, 7,
+
+                4, 3, 0, // y+ side
+                4, 7, 3,
+
+                1, 2, 5, // y- side
+                2, 6, 5,
+
+                0, 1, 4,// x+ side
+                1, 5, 4,
+
+                7, 2, 3,// x- side
+                7, 6, 2,
+            };
+            Mesh mesh{vertices, indices};
+            
+            return mesh;
+        }
+    }
+
+    void addObjectDataSlot() {
         ObjectInfo_t* tempObjectInfo;
         EngineObject* tempEngineObjects;
 
-        if (objectCount + 1 > objectCapacity) {
+        if ((int)objectCount + 1 > objectCapacity) {
+            std::cout << "object capacity reached" << std::endl;
             objectCapacity *= 2;
             tempObjectInfo = new ObjectInfo_t[objectCapacity];
             tempEngineObjects = new EngineObject[objectCapacity];
-            for (int i = 0; i < objectCount; i++)
+            for (int i = 0; i < (int)objectCount; i++)
             {
                 tempObjectInfo[i] = objectInfo[i];
                 tempEngineObjects[i] = engineObjects[i];
@@ -157,116 +275,7 @@ private:
             tempObjectInfo = nullptr;
             tempEngineObjects = nullptr;
         }
-        objectInfo[objectCount] = objectInfo_;
-        engineObjects[objectCount] = object;
-        object.objectInfoIndex = objectCount;
         objectCount++;
-    }
-
-    // loads a model with supported ASSIMP extensions from file and stores the resulting meshes in the meshes vector.
-    void loadModel(std::string const& path, std::string& directory, std::vector<Mesh>& meshes)
-    {
-        // read file via ASSIMP
-        Assimp::Importer importer;
-        const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);
-        // check for errors
-        if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) // if is Not Zero
-        {
-            std::cout << "ERROR::ASSIMP:: " << importer.GetErrorString() << std::endl;
-            return;
-        }
-        // retrieve the directory path of the filepath
-        directory = path.substr(0, path.find_last_of('/'));
-
-        // process ASSIMP's root node recursively
-        processNode(scene->mRootNode, scene, meshes);
-    }
-
-    // processes a node in a recursive fashion. Processes each individual mesh located at the node and repeats this process on its children nodes (if any).
-    void processNode(aiNode* node, const aiScene* scene, std::vector<Mesh>& meshes)
-    {
-        // process each mesh located at the current node
-        for (unsigned int i = 0; i < node->mNumMeshes; i++)
-        {
-            // the node object only contains indices to index the actual objects in the scene. 
-            // the scene contains all the data, node is just to keep stuff organized (like relations between nodes).
-            aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
-            meshes.push_back(processMesh(mesh, scene));
-        }
-        // after we've processed all of the meshes (if any) we then recursively process each of the children nodes
-        for (unsigned int i = 0; i < node->mNumChildren; i++)
-        {
-            processNode(node->mChildren[i], scene, meshes);
-        }
-    }
-
-    Mesh processMesh(aiMesh* mesh, const aiScene* scene)
-    {
-        // data to fill
-        std::vector<Vertex> vertices;
-        std::vector<unsigned int> indices;
-        std::vector<Texture> textures;
-
-        // walk through each of the mesh's vertices
-        for (unsigned int i = 0; i < mesh->mNumVertices; i++)
-        {
-            Vertex vertex;
-            glm::vec3 vector; // we declare a placeholder vector since assimp uses its own vector class that doesn't directly convert to glm's vec3 class so we transfer the data to this placeholder glm::vec3 first.
-            // positions
-            vector.x = mesh->mVertices[i].x;
-            vector.y = mesh->mVertices[i].y;
-            vector.z = mesh->mVertices[i].z;
-            vertex.position = vector;
-            // normals
-            if (mesh->HasNormals())
-            {
-                vector.x = mesh->mNormals[i].x;
-                vector.y = mesh->mNormals[i].y;
-                vector.z = mesh->mNormals[i].z;
-                vertex.normal = vector;
-            }
-            // texture coordinates
-            if (mesh->mTextureCoords[0]) // does the mesh contain texture coordinates?
-            {
-                glm::vec2 vec;
-                // a vertex can contain up to 8 different texture coordinates. We thus make the assumption that we won't 
-                // use models where a vertex can have multiple texture coordinates so we always take the first set (0).
-                vec.x = mesh->mTextureCoords[0][i].x;
-                vec.y = mesh->mTextureCoords[0][i].y;
-                vertex.texCoords = vec;
-                // tangent
-                vector.x = mesh->mTangents[i].x;
-                vector.y = mesh->mTangents[i].y;
-                vector.z = mesh->mTangents[i].z;
-                vertex.tangent = vector;
-                // bitangent
-                vector.x = mesh->mBitangents[i].x;
-                vector.y = mesh->mBitangents[i].y;
-                vector.z = mesh->mBitangents[i].z;
-                vertex.bitangent = vector;
-            }
-            else
-                vertex.texCoords = glm::vec2(0.0f, 0.0f);
-
-            vertices.push_back(vertex);
-        }
-        // now wak through each of the mesh's faces (a face is a mesh its triangle) and retrieve the corresponding vertex indices.
-        for (unsigned int i = 0; i < mesh->mNumFaces; i++)
-        {
-            aiFace face = mesh->mFaces[i];
-            // retrieve all indices of the face and store them in the indices vector
-            for (unsigned int j = 0; j < face.mNumIndices; j++)
-                indices.push_back(face.mIndices[j]);
-        }
-        // process materials
-        aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
-        // we assume a convention for sampler names in the shaders. Each diffuse texture should be named
-        // as 'texture_diffuseN' where N is a sequential number ranging from 1 to MAX_SAMPLER_NUMBER. 
-        // Same applies to other texture as the following list summarizes:
-
-
-        // return a mesh object created from the extracted mesh data
-        return Mesh(vertices, indices, textures);
     }
 };
 

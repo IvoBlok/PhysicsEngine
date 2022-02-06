@@ -141,7 +141,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>GLFW-3.3\glfw3.lib;opengl32.lib;ASSIMP-3.3.1\assimp-vc140-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\C++Engine Libraries + Includes\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\C++Engine Libraries + Includes\lib;C:\C++Engine Libraries + Includes\lib\ASSIMP-3.3.1;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -159,7 +159,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>GLFW-3.3\glfw3.lib;opengl32.lib;ASSIMP-3.3.1\assimp-vc140-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\C++Engine Libraries + Includes\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\C++Engine Libraries + Includes\lib;C:\C++Engine Libraries + Includes\lib\ASSIMP-3.3.1;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -173,6 +173,7 @@
     <ClInclude Include="src\EngineObject.h" />
     <ClInclude Include="src\external\stb_image.h" />
     <ClInclude Include="src\GLFWHandler.h" />
+    <ClInclude Include="src\MathFunctions.h" />
     <ClInclude Include="src\Mesh.h" />
     <ClInclude Include="src\settings.h" />
     <ClInclude Include="src\shaders\Shader.h" />

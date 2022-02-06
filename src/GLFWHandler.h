@@ -53,6 +53,10 @@ public:
 		}
 	}
 
+	static void terminateGLFW() {
+		glfwTerminate();
+	}
+
 private:
 	static void setCallbacks(GLFWwindow* window) {
 		glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
@@ -82,16 +86,16 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 {
 	if (firstMouse)
 	{
-		lastX = xpos;
-		lastY = ypos;
+		lastX = (float)xpos;
+		lastY = (float)ypos;
 		firstMouse = false;
 	}
 
-	float xoffset = xpos - lastX;
-	float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
+	float xoffset = (float)xpos - lastX;
+	float yoffset = lastY - (float)ypos; // reversed since y-coordinates go from bottom to top
 
-	lastX = xpos;
-	lastY = ypos;
+	lastX = (float)xpos;
+	lastY = (float)ypos;
 
 	camera.ProcessMouseMovement(xoffset, yoffset);
 }
