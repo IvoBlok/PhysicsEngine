@@ -37,7 +37,7 @@ int main() {
     BufferHandler bufferHandler{camera, ourShader};
 
     EngineObject& cube1 = bufferHandler.engineObjects[bufferHandler.createEngineObject("cube")];
-    EngineObject& cube2 = bufferHandler.engineObjects[bufferHandler.createEngineObject("cube", glm::vec3(2, 6, -13))];
+    EngineObject& cube2 = bufferHandler.engineObjects[bufferHandler.createEngineObject("cube", glm::vec3(2, 6, -13), glm::vec3(1, 0, 0))];
     
     // initialize openGL settings
     // -------------------------------------------------------------------------------------------
@@ -67,10 +67,10 @@ int main() {
             ourShader.setDirLight(directionalLight);
         }
         else if (inputs.size() == 1 && inputs[0] == -1) {
-            bufferHandler.engineObjects[bufferHandler.createEngineObject("cube", glm::vec3(randomRange(-10, 10), randomRange(-10, 10), randomRange(-5, 5)))];
+            bufferHandler.engineObjects[bufferHandler.createEngineObject("cube", glm::vec3(randomRange(-5, 5), randomRange(-5, 5), randomRange(-5, 5)))];
         }
 
-        std::cout << "Objects: " << bufferHandler.objectCount << "   FPS: " << 1 / deltaTime << std::endl;
+        //std::cout << "Objects: " << bufferHandler.objectCount << "   FPS: " << 1 / deltaTime << std::endl;
 
         // render
         // -----------
