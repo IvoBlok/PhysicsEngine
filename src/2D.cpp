@@ -37,7 +37,7 @@ int main() {
     BufferHandler bufferHandler{camera, ourShader};
 
     EngineObject& cube1 = bufferHandler.engineObjects[bufferHandler.createEngineObject("cube")];
-    EngineObject& cube2 = bufferHandler.engineObjects[bufferHandler.createEngineObject("cube", glm::vec3(2, 6, -13), glm::vec3(1, 0, 0))];
+    //EngineObject& cube2 = bufferHandler.engineObjects[bufferHandler.createEngineObject("cube", glm::vec3(2, 6, -13), glm::vec3(1, 0, 0))];
     
     // initialize openGL settings
     // -------------------------------------------------------------------------------------------
@@ -126,5 +126,4 @@ std::vector<float> processInput(GLFWwindow* window)
         return returnValues;
     }
     return std::vector<float>{};
-
 }

@@ -14,6 +14,7 @@
 #include "Mesh.h"
 
 //TODO if objectMeshes change, bufferhandler should check if that object was in an instanced group and update accordingly
+//TODO updatebuffers should create the buffers for every group of draw group
 
 class BufferHandler {
 public:
@@ -47,7 +48,6 @@ public:
 
         // check if the new object can be drawn as an instance of others
         int matchingObjectIndex = matchObjectMeshToKnow(mesh);
-        std::cout << "matchingObjectIndex: " << matchingObjectIndex << std::endl;
         if (matchingObjectIndex != -1 && ALLOW_INSTANCED_DRAWING) {
             int groupIndex = findValueInNestedVector(matchingObjectIndex);
             if (groupIndex != NULL) {
@@ -81,25 +81,40 @@ public:
 	};
 
 	void updateBuffers() {
-        glGenVertexArrays(1, &VAO);
-        glGenBuffers(1, &VBO);
-        glGenBuffers(1, &EBO);
-        // bind the Vertex Array Object first, then bind and set vertex buffer(s), and then configure vertex attributes(s).
-        glBindVertexArray(VAO);
+        // first go over all instancing groups
+        // ---------------------------------
+        for (size_t i = 0; i < instancingGroups.size(); i++)
+        {
+            updateBufferGroup(i + 1);
+        }
+        // update main buffer group
+        // ---------------------------------
+        updateBufferGroup(0);
 
-        glBindBuffer(GL_ARRAY_BUFFER, VBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(float) * vertexCount, vertices, GL_STATIC_DRAW);
-
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * indexCount, indices, GL_STATIC_DRAW);
-
-        // position attribute
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-        glEnableVertexAttribArray(0);
-
+        /*
         //configure the uniform buffer objects
         // ---------------------------------
         // first. We get the relevant block indices
+        unsigned int uniformBlockIndexMatrices = glGetUniformBlockIndex(shader.ID, "Matrices");
+        // Now actually create the buffer
+        if (!UBOInitialized) {
+            glGenBuffers(1, &UBO);
+            glBufferData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), NULL, GL_STATIC_DRAW);
+            UBOInitialized = true;
+        }
+        glBindBuffer(GL_UNIFORM_BUFFER, UBO);
+        // then we link each shader's uniform block to this uniform binding point
+        glUniformBlockBinding(shader.ID, uniformBlockIndexMatrices, 0);
+        std::cout << (glGetError());
+
+        glBindBufferRange(GL_UNIFORM_BUFFER, 0, UBO, 0, 2 * sizeof(glm::mat4));
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        std::cout << (glGetError());
+
+        glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection));
+        glBindBuffer(GL_UNIFORM_BUFFER, 0);
+        */
+        //configure the uniform buffer objects
         unsigned int uniformBlockIndexMatrices = glGetUniformBlockIndex(shader.ID, "Matrices");
         // then we link each shader's uniform block to this uniform binding point
         glUniformBlockBinding(shader.ID, uniformBlockIndexMatrices, 0);
@@ -118,14 +133,6 @@ public:
         glBindBuffer(GL_UNIFORM_BUFFER, UBO);
         glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection));
         glBindBuffer(GL_UNIFORM_BUFFER, 0);
-
-        //configure the storage buffer objects
-        // ---------------------------------
-        glGenBuffers(1, &SSBO);
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, SSBO);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(ObjectInfo_t) * objectCount, objectInfo, GL_DYNAMIC_COPY);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, SSBO);
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     };
 
     // function responsible for executing the sorted draw operations. a potentially large list of instanced draw calls and a final draw call for the leftovers
@@ -150,8 +157,7 @@ public:
         glm::mat4 view = camera.GetViewMatrix();
         glBindBuffer(GL_UNIFORM_BUFFER, UBO);
         glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
-        glBindBuffer(GL_UNIFORM_BUFFER, 0);
-
+        
         for (size_t i = 0; i < instancingGroups.size(); i++)
         {
             glBindVertexArray(VAOs[i + 1]);
@@ -162,11 +168,16 @@ public:
             GLsizei indicesSize = objectInfo[instancingGroups[i][0]].indices[3] - objectInfo[instancingGroups[i][0]].indices[2] + 1;
             glDrawElementsInstanced(GL_TRIANGLES, indicesSize, GL_UNSIGNED_INT, 0, (GLsizei)instancingGroups[i].size());
         }
+
         glBindVertexArray(VAOs[0]);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
         glBindBuffer(GL_ARRAY_BUFFER, VBOs[0]);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBOs[0]);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, SSBOs[0]);
+        
         shader.setBool("instancing", false);
+
+        combinedDrawCallIndexSize = indexCount; //! TEMPORARY
         glDrawElements(GL_TRIANGLES, (GLsizei)combinedDrawCallIndexSize, GL_UNSIGNED_INT, 0);
     }
 
@@ -198,6 +209,7 @@ private:
     std::vector<unsigned int> VAOs;
     std::vector<unsigned int> SSBOs;
     unsigned int UBO;
+    bool UBOInitialized;
 
     int combinedDrawCallIndexSize;
 
@@ -308,6 +320,80 @@ private:
             
             return mesh;
         }
+    }
+
+    unsigned int* getIndicesForGroup(int index) {
+
+    }
+
+    float* getVerticesForGroup(int index) {
+        
+    }
+
+    unsigned int* getIndicesForCombinedGroup() {
+        int indexSize = indexCount;
+        for (size_t i = 0; i < instancingGroups.size(); i++)
+        {
+            indexSize -= (objectInfo[instancingGroups[i][0]].indices[3] - objectInfo[instancingGroups[i][0]].indices[2]) * instancingGroups[i].size();
+        }
+        
+        unsigned int* indices = new unsigned int[indexSize];
+        int currentIndex = 0;
+
+        for (size_t i = 0; i < instancingGroups.size(); i++)
+        {
+
+        }
+        return indices;
+    }
+
+    float* getVerticesForCombinedGroup() {
+
+    }
+
+    void copyFromArrayToArray(unsigned int* arrayToCopyTo, unsigned int* arrayToCopy, int firstIndex, int lastIndex, int startIndexInArrayToCopyTo = 0) {
+        for (size_t i = firstIndex; i <= lastIndex - firstIndex; i++)
+        {
+            arrayToCopyTo[startIndexInArrayToCopyTo + i] = arrayToCopy[firstIndex + i];
+        }
+    }
+    void copyFromArrayToArray(float* arrayToCopyTo, float* arrayToCopy, int firstIndex, int lastIndex, int startIndexInArrayToCopyTo = 0) {
+        for (size_t i = firstIndex; i <= lastIndex - firstIndex; i++)
+        {
+            arrayToCopyTo[startIndexInArrayToCopyTo + i] = arrayToCopy[firstIndex + i];
+        }
+    }
+
+    void updateBufferGroup(int index) {
+        // if the group is new, create the buffers
+        if (VBOs.size() <= index) {
+            unsigned int VAO, VBO, EBO, SSBO;
+
+            glGenVertexArrays(1, &VAO);
+            glGenBuffers(1, &VBO);
+            glGenBuffers(1, &EBO);
+            glGenBuffers(1, &SSBO);
+            glBindVertexArray(VAO);
+
+            VAOs.push_back(VAO);
+            VBOs.push_back(VBO);
+            EBOs.push_back(EBO);
+            SSBOs.push_back(SSBO);
+
+            glEnableVertexAttribArray(0);
+        }
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+
+        //bind data
+        glBindBuffer(GL_ARRAY_BUFFER, VBOs[index]);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(float) * vertexCount, vertices, GL_STATIC_DRAW); //TODO get correct data
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBOs[index]);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * indexCount, indices, GL_STATIC_DRAW); //TODO get correct data
+
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, SSBOs[index]);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(ObjectInfo_t) * objectCount, objectInfo, GL_DYNAMIC_COPY); //TODO get correct data
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, SSBOs[index]);
     }
 
     void addObjectDataSlot() {
