@@ -14,7 +14,9 @@
 #include "Mesh.h"
 
 //TODO if objectMeshes change, bufferhandler should check if that object was in an instanced group and update accordingly
-//TODO updatebuffers should create the buffers for every group of draw group
+//TODO instead of refreshing everything when creating a new object, update only the relevant buffers
+//TODO write getobjectsfromgroup functions.
+//! would be nice to combine the functions for getting the indices,vertices and objects per type to one function.
 
 class BufferHandler {
 public:
@@ -211,6 +213,10 @@ private:
     unsigned int UBO;
     bool UBOInitialized;
 
+    std::vector<std::pair<unsigned int*, int>> indicesDataVec;
+    std::vector<std::pair<float*, int>> verticesDataVec;
+    std::vector<std::pair<ObjectInfo_t*, int>> objectDataVec;
+
     int combinedDrawCallIndexSize;
 
     std::vector<int> addToArrays(Mesh& mesh) {
@@ -320,34 +326,128 @@ private:
             
             return mesh;
         }
+        if (type == "test") {
+            std::vector<float> vertices = {
+                // positions      
+                 0.5f,  0.5f, -0.2f,
+                 0.5f, -0.5f, -0.5f,
+                -0.5f, -0.5f, -0.5f,
+                -0.5f,  0.5f, -0.5f,
+
+                 0.5f,  0.5f,  0.5f,
+                 0.5f, -0.5f,  0.5f,
+                -0.5f, -0.5f,  0.5f,
+                -0.5f,  0.5f,  0.5f,
+            };
+
+            std::vector<unsigned int> indices = {
+                3, 1, 0, // back side
+                3, 2, 1,
+
+                4, 5, 7, // front side
+                5, 6, 7,
+
+                4, 3, 0, // y+ side
+                4, 7, 3,
+
+                1, 2, 5, // y- side
+                2, 6, 5,
+
+                0, 1, 4,// x+ side
+                1, 5, 4,
+
+                7, 2, 3,// x- side
+                7, 6, 2,
+            };
+            Mesh mesh{ vertices, indices };
+
+            return mesh;
+        }
     }
 
-    unsigned int* getIndicesForGroup(int index) {
+    std::pair<unsigned int*, int> getIndicesForGroup(int index) {
+
+        int firstIndex = objectInfo[instancingGroups[0][0]].indices[2];
+        int lastIndex = objectInfo[instancingGroups[0][0]].indices[3];
+        int indexSize = lastIndex - firstIndex;
+        unsigned int* indices_ = new unsigned int[indexSize];
+
+        for (size_t i = 0; i < indexSize; i++)
+        {
+            indices_[i] = indices[firstIndex + i];
+        }
+        std::pair<unsigned int*, int> result(indices_, indexSize);
+        return result;
+    }
+    std::pair<float*, int> getVerticesForGroup(int index) {
+
+        int firstIndex = objectInfo[instancingGroups[0][0]].indices[0];
+        int lastIndex = objectInfo[instancingGroups[0][0]].indices[1];
+        int indexSize = lastIndex - firstIndex;
+        float* vertices_ = new float[indexSize];
+
+        for (size_t i = 0; i < indexSize; i++)
+        {
+            vertices_[i] = vertices[firstIndex + i];
+        }
+        std::pair<float*, int> result(vertices_, indexSize);
+        return result;
+    }
+    std::pair<ObjectInfo_t*, int> getObjectsForGroup(int index) {
 
     }
 
-    float* getVerticesForGroup(int index) {
-        
-    }
-
-    unsigned int* getIndicesForCombinedGroup() {
+    std::pair<unsigned int*, int> getIndicesForCombinedGroup() {
         int indexSize = indexCount;
         for (size_t i = 0; i < instancingGroups.size(); i++)
         {
             indexSize -= (objectInfo[instancingGroups[i][0]].indices[3] - objectInfo[instancingGroups[i][0]].indices[2]) * instancingGroups[i].size();
         }
         
-        unsigned int* indices = new unsigned int[indexSize];
+        unsigned int* indices_ = new unsigned int[indexSize];
         int currentIndex = 0;
 
+        for (int i = 0; i < indexCount; i++)
+        {
+            for (size_t j = 0; j < instancingGroups.size(); j++)
+            {
+                if (i >= objectInfo[instancingGroups[j][0]].indices[2] && i <= objectInfo[instancingGroups[j][0]].indices[3]) { goto next; }
+            }
+            indices_[currentIndex] = indices[i];
+            currentIndex++;
+
+            next:
+            continue;
+        }
+        std::pair<unsigned int*, int> result(indices_, indexSize);
+        return result;
+    }
+    std::pair<float*, int> getVerticesForCombinedGroup() {
+        int vertexSize = vertexCount;
         for (size_t i = 0; i < instancingGroups.size(); i++)
         {
-
+            vertexSize -= (objectInfo[instancingGroups[i][0]].indices[1] - objectInfo[instancingGroups[i][0]].indices[0]) * instancingGroups[i].size();
         }
-        return indices;
-    }
 
-    float* getVerticesForCombinedGroup() {
+        float* vertices_ = new float[vertexSize];
+        int currentIndex = 0;
+
+        for (int i = 0; i < vertexCount; i++)
+        {
+            for (size_t j = 0; j < instancingGroups.size(); j++)
+            {
+                if (i >= objectInfo[instancingGroups[j][0]].indices[0] && i <= objectInfo[instancingGroups[j][0]].indices[1]) { goto next; }
+            }
+        vertices_[currentIndex] = vertices[i];
+        currentIndex++;
+
+        next:
+        continue;
+        }
+        std::pair<float*, int> result(vertices_, vertexSize);
+        return result;
+    }
+    std::pair<ObjectInfo_t*, int> getObjectsForCombinedGroup(int index) {
 
     }
 
@@ -365,6 +465,7 @@ private:
     }
 
     void updateBufferGroup(int index) {
+
         // if the group is new, create the buffers
         if (VBOs.size() <= index) {
             unsigned int VAO, VBO, EBO, SSBO;
@@ -384,15 +485,32 @@ private:
         }
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 
+        if (indicesDataVec.size() >= index) {
+            indicesDataVec.push_back(std::pair<unsigned int*, int>());
+            verticesDataVec.push_back(std::pair<float*, int>());
+            objectDataVec.push_back(std::pair<ObjectInfo_t*, int>());
+        }
+
+        if (index == 0) {
+            indicesDataVec[index] = getIndicesForCombinedGroup();
+            verticesDataVec[index] = getVerticesForCombinedGroup();
+            objectDataVec[index] = getObjectsForCombinedGroup();
+        }
+        else {
+            indicesDataVec[index] = getIndicesForGroup(index);
+            verticesDataVec[index] = getVerticesForGroup(index);
+            objectDataVec[index] = getObjectsForGroup(index);
+        }
+
         //bind data
         glBindBuffer(GL_ARRAY_BUFFER, VBOs[index]);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(float) * vertexCount, vertices, GL_STATIC_DRAW); //TODO get correct data
+        glBufferData(GL_ARRAY_BUFFER, sizeof(float) * verticesDataVec[index].second, verticesDataVec[index].first, GL_STATIC_DRAW);
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBOs[index]);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * indexCount, indices, GL_STATIC_DRAW); //TODO get correct data
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * indicesDataVec[index].second, indicesDataVec[index].first, GL_STATIC_DRAW);
 
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, SSBOs[index]);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(ObjectInfo_t) * objectCount, objectInfo, GL_DYNAMIC_COPY); //TODO get correct data
+        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(ObjectInfo_t) * objectDataVec[index].second, objectDataVec[index].first, GL_DYNAMIC_COPY);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, SSBOs[index]);
     }
 
@@ -447,11 +565,8 @@ private:
             }
 
             // check if the indices overlap
-            std::cout << "Index size: " << mesh_.indices.size();
             for (size_t j = 0; j < mesh_.indices.size(); j++)
             {
-                std::cout << "1: " << j << " : " << firstIndexIndex + j - firstVertexIndex << std::endl;
-                std::cout << "2: " << mesh_.indices[j] << " : " << indices[firstIndexIndex + j - firstVertexIndex] << std::endl;
                 if (mesh_.indices[j] != indices[firstIndexIndex + j - firstVertexIndex]) { goto next; }
             }
             return i;
