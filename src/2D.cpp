@@ -16,6 +16,8 @@
 #include <iostream>
 #include <cmath>
 
+bool buttonPressed = false;
+
 int main() {
     // glfw window creation
     // --------------------
@@ -28,16 +30,22 @@ int main() {
 
     // build and compile our shader program
     // ------------------------------------
-    Shader ourShader("src/shaders/simple_lighting_shader.vert",
-                     "src/shaders/simple_lighting_shader.frag",
-                     "src/shaders/simple_lighting_shader.geom");
+    Shader ourShader("../src/shaders/simple_lighting_shader.vert",
+                     "../src/shaders/simple_lighting_shader.frag",
+                     "../src/shaders/simple_lighting_shader.geom");
 
     // set up vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------
     BufferHandler bufferHandler{camera, ourShader};
 
     EngineObject& cube1 = bufferHandler.engineObjects[bufferHandler.createEngineObject("cube")];
-    EngineObject& cube2 = bufferHandler.engineObjects[bufferHandler.createEngineObject("cube", glm::vec3(2, 6, -13), glm::vec3(1, 0, 0))];
+    //bufferHandler.engineObjects[bufferHandler.createEngineObject("cube", glm::vec3(randomRange(-5, 5), randomRange(-5, 5), randomRange(-5, 5)), glm::vec3(1, 0, 0))];
+    //bufferHandler.engineObjects[bufferHandler.createEngineObject("cube", glm::vec3(randomRange(-5, 5), randomRange(-5, 5), randomRange(-5, 5)), glm::vec3(1, 0, 0))];
+    //bufferHandler.engineObjects[bufferHandler.createEngineObject("cube", glm::vec3(randomRange(-5, 5), randomRange(-5, 5), randomRange(-5, 5)), glm::vec3(1, 0, 0))];
+    //bufferHandler.engineObjects[bufferHandler.createEngineObject("cube", glm::vec3(randomRange(-5, 5), randomRange(-5, 5), randomRange(-5, 5)), glm::vec3(1, 0, 0))];
+
+    //EngineObject& cube2 = bufferHandler.engineObjects[bufferHandler.createEngineObject("cube")];
+    //EngineObject& cube2 = bufferHandler.engineObjects[bufferHandler.createEngineObject("test", glm::vec3(1, 1, 1), glm::vec3(1, 0, 0))];
     
     // initialize openGL settings
     // -------------------------------------------------------------------------------------------
@@ -55,6 +63,9 @@ int main() {
 
     // render loop
     // -----------
+
+    bool test = true;
+
     while (!glfwWindowShouldClose(window))
     {
         updateTime();
@@ -62,12 +73,22 @@ int main() {
         // input
         // -----------
         std::vector<float> inputs = processInput(window);
-        if (inputs.size() == 3) {
-            directionalLight.direction = glm::vec3(inputs[0], inputs[1], inputs[2]);
-            ourShader.setDirLight(directionalLight);
+        if (inputs.size() != 0) {
+            if (inputs.size() == 3 && !buttonPressed) {
+                directionalLight.direction = glm::vec3(inputs[0], inputs[1], inputs[2]);
+                ourShader.setDirLight(directionalLight);
+            }
+            else if (inputs.size() == 1 && inputs[0] == -1 && !buttonPressed) {
+                //bufferHandler.engineObjects[bufferHandler.createEngineObject("cube", glm::vec3(randomRange(-5, 5), randomRange(-5, 5), randomRange(-5, 5)))];
+                bufferHandler.engineObjects[bufferHandler.createEngineObject("test", glm::vec3(randomRange(-5, 5), randomRange(-5, 5), randomRange(-5, 5)), glm::vec3(1, 0, 0))];
+            }
+            else if (inputs.size() == 1 && inputs[0] == -2 && !buttonPressed) {
+                bufferHandler.engineObjects[bufferHandler.createEngineObject("cube", glm::vec3(randomRange(-5, 5), randomRange(-5, 5), randomRange(-5, 5)), glm::vec3(1, 0, 0))];
+            }
+            buttonPressed = true;
         }
-        else if (inputs.size() == 1 && inputs[0] == -1) {
-            bufferHandler.engineObjects[bufferHandler.createEngineObject("cube", glm::vec3(randomRange(-5, 5), randomRange(-5, 5), randomRange(-5, 5)))];
+        else {
+            buttonPressed = false;
         }
 
         //std::cout << "Objects: " << bufferHandler.objectCount << "   FPS: " << 1 / deltaTime << std::endl;
@@ -81,6 +102,10 @@ int main() {
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -----------
+        if (glGetError() != 0) {
+            std::cout << "glError: " << glGetError() << std::endl;
+        }
+        
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
@@ -93,6 +118,7 @@ int main() {
     GLFWHandler::terminateGLFW();
     return 0;
 }
+
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
@@ -123,6 +149,10 @@ std::vector<float> processInput(GLFWwindow* window)
     }
     if (glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS) {
         std::vector<float> returnValues = { -1 };
+        return returnValues;
+    }
+    if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS) {
+        std::vector<float> returnValues = { -2 };
         return returnValues;
     }
     return std::vector<float>{};

@@ -1,5 +1,5 @@
 // Geometry Shader
-#version 450
+#version 430
 
 layout(triangles) in;
 layout(triangle_strip, max_vertices = 3) out;

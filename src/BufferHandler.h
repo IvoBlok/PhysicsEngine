@@ -6,6 +6,7 @@
 #include <ASSIMP-3.3.1/scene.h>
 #include <ASSIMP-3.3.1/postprocess.h>
 #include <external/stb_image.h>
+#include <GLM/gtx/string_cast.hpp>
 
 //internal
 #include "settings.h"
@@ -17,6 +18,7 @@
 //TODO instead of refreshing everything when creating a new object, update only the relevant buffers
 //TODO write getobjectsfromgroup functions.
 //! would be nice to combine the functions for getting the indices,vertices and objects per type to one function.
+//! also the current version of the above mentioned functions are horribly inefficient
 
 class BufferHandler {
 public:
@@ -29,7 +31,6 @@ public:
 	EngineObject* engineObjects = new EngineObject[0];
 
     std::vector<std::vector<int>> instancingGroups; // every group is a vector of indices to the relevant objectinfo object
-    std::vector<int> combinedDrawCallGroup;
 
 	BufferHandler(Camera& camera_, Shader& shader_) : camera(camera_), shader(shader_) {
 		vertices = new float[INITIAL_VERTEX_BUFFER_CAPACITY];
@@ -61,18 +62,15 @@ public:
                 instancingGroups[instancingGroups.size() - 1].push_back(objectCount - 1);
             }
             
-            std::cout << "INSTANCING WORKING!";
 
             objectInfo[objectCount - 1].indices = objectInfo[matchingObjectIndex].indices;
         }
-        else {
-            std::vector<int> indices = addToArrays(mesh);
-            objectInfo[objectCount - 1].indices = glm::vec4(indices[0], indices[1], indices[2], indices[3]);
-        }
+        std::vector<int> indices = addToArrays(mesh);
+        objectInfo[objectCount - 1].indices = glm::vec4(indices[0], indices[1], indices[2], indices[3]);
         
         // Update the object and objectinfo arrays
         objectInfo[objectCount - 1].color = glm::vec4(color, 0);
-        objectInfo[objectCount - 1].geometryMatrix = glm::translate(objectInfo[objectCount - 1].geometryMatrix, position);
+        objectInfo[objectCount - 1].geometryMatrix = glm::translate(glm::mat4(1), position);
 
         engineObjects[objectCount - 1].objectInfoIndex = objectCount - 1;
 
@@ -117,24 +115,28 @@ public:
         glBindBuffer(GL_UNIFORM_BUFFER, 0);
         */
         //configure the uniform buffer objects
-        unsigned int uniformBlockIndexMatrices = glGetUniformBlockIndex(shader.ID, "Matrices");
-        // then we link each shader's uniform block to this uniform binding point
-        glUniformBlockBinding(shader.ID, uniformBlockIndexMatrices, 0);
-        // Now actually create the buffer
-        glGenBuffers(1, &UBO);
-        glBindBuffer(GL_UNIFORM_BUFFER, UBO);
-        glBufferData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), NULL, GL_STATIC_DRAW);
-        glBindBuffer(GL_UNIFORM_BUFFER, 0);
-        // define the range of the buffer that links to a uniform binding point
-        glBindBufferRange(GL_UNIFORM_BUFFER, 0, UBO, 0, 2 * sizeof(glm::mat4));
+        if (!UBOInitialized) {
+            unsigned int uniformBlockIndexMatrices = glGetUniformBlockIndex(shader.ID, "Matrices");
+            // then we link each shader's uniform block to this uniform binding point
+            glUniformBlockBinding(shader.ID, uniformBlockIndexMatrices, 0);
+            // Now actually create the buffer
+            glGenBuffers(1, &UBO);
+            glBindBuffer(GL_UNIFORM_BUFFER, UBO);
+            glBufferData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), NULL, GL_STATIC_DRAW);
+            glBindBuffer(GL_UNIFORM_BUFFER, 0);
+            // define the range of the buffer that links to a uniform binding point
+            glBindBufferRange(GL_UNIFORM_BUFFER, 0, UBO, 0, 2 * sizeof(glm::mat4));
 
-        // calculate projection matrix
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+            // calculate projection matrix
+            projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 
-        // store the projection matrix
-        glBindBuffer(GL_UNIFORM_BUFFER, UBO);
-        glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection));
-        glBindBuffer(GL_UNIFORM_BUFFER, 0);
+            // store the projection matrix
+            glBindBuffer(GL_UNIFORM_BUFFER, UBO);
+            glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection));
+            glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
+            UBOInitialized = true;
+        }
     };
 
     // function responsible for executing the sorted draw operations. a potentially large list of instanced draw calls and a final draw call for the leftovers
@@ -155,10 +157,41 @@ public:
         
         glDrawElements(GL_TRIANGLES, (GLsizei)indexCount, GL_UNSIGNED_INT, 0); */
         // NEW?
-        shader.setVec3("viewPos", camera.Position);
-        glm::mat4 view = camera.GetViewMatrix();
+        
+        // DEBUG
+        /*
+        std::cout << std::endl << "DEBUG RENDER VALUES MAIN GROUP " << std::endl;
+        std::cout << "indices: " << std::endl;
+        for (int i = 0; i < indicesDataVec[0].second; i++)
+        {
+            std::cout << indicesDataVec[0].first[i] << std::endl;
+        }
+        std::cout << "vertices: " << std::endl;
+        for (int i = 0; i < verticesDataVec[0].second; i++)
+        {
+            std::cout << verticesDataVec[0].first[i] << std::endl;
+        }*/
+
+        
+        frame++;
+        view = camera.GetViewMatrix();
         glBindBuffer(GL_UNIFORM_BUFFER, UBO);
         glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
+
+        if (objectDataVec[0].second > 0) {
+
+            glBindVertexArray(VAOs[0]);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+
+            glBindBuffer(GL_ARRAY_BUFFER, VBOs[0]);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBOs[0]);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, SSBOs[0]);
+
+            shader.setBool("instancing", false);
+
+            glDrawElements(GL_TRIANGLES, (GLsizei)indicesDataVec[0].second, GL_UNSIGNED_INT, 0);
+        }
+        
         
         for (size_t i = 0; i < instancingGroups.size(); i++)
         {
@@ -167,20 +200,9 @@ public:
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBOs[i + 1]);
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, SSBOs[i + 1]);
 
-            GLsizei indicesSize = objectInfo[instancingGroups[i][0]].indices[3] - objectInfo[instancingGroups[i][0]].indices[2] + 1;
-            glDrawElementsInstanced(GL_TRIANGLES, indicesSize, GL_UNSIGNED_INT, 0, (GLsizei)instancingGroups[i].size());
+            glDrawElementsInstanced(GL_TRIANGLES, indicesDataVec[i + 1].second, GL_UNSIGNED_INT, 0, (GLsizei)objectDataVec[i + 1].second);
         }
-
-        glBindVertexArray(VAOs[0]);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-        glBindBuffer(GL_ARRAY_BUFFER, VBOs[0]);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBOs[0]);
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, SSBOs[0]);
         
-        shader.setBool("instancing", false);
-
-        combinedDrawCallIndexSize = indexCount; //! TEMPORARY
-        glDrawElements(GL_TRIANGLES, (GLsizei)combinedDrawCallIndexSize, GL_UNSIGNED_INT, 0);
     }
 
     ~BufferHandler() {
@@ -217,7 +239,9 @@ private:
     std::vector<std::pair<float*, int>> verticesDataVec;
     std::vector<std::pair<ObjectInfo_t*, int>> objectDataVec;
 
-    int combinedDrawCallIndexSize;
+    int frame = 0;
+    glm::mat4 view;
+    glm::mat4 projection;
 
     std::vector<int> addToArrays(Mesh& mesh) {
         std::vector<int> returnValues;
@@ -366,11 +390,12 @@ private:
     }
 
     std::pair<unsigned int*, int> getIndicesForGroup(int index) {
-
-        int firstIndex = objectInfo[instancingGroups[0][0]].indices[2];
-        int lastIndex = objectInfo[instancingGroups[0][0]].indices[3];
-        int indexSize = lastIndex - firstIndex;
+        int firstIndex = objectInfo[instancingGroups[index][0]].indices[2];
+        int lastIndex = objectInfo[instancingGroups[index][0]].indices[3];
+        int indexSize = lastIndex - firstIndex + 1;
         unsigned int* indices_ = new unsigned int[indexSize];
+
+        std::cout << "indices group: " << index << " index group: " << indexSize << std::endl;
 
         for (size_t i = 0; i < indexSize; i++)
         {
@@ -381,9 +406,9 @@ private:
     }
     std::pair<float*, int> getVerticesForGroup(int index) {
 
-        int firstIndex = objectInfo[instancingGroups[0][0]].indices[0];
-        int lastIndex = objectInfo[instancingGroups[0][0]].indices[1];
-        int indexSize = lastIndex - firstIndex;
+        int firstIndex = objectInfo[instancingGroups[index][0]].indices[0];
+        int lastIndex = objectInfo[instancingGroups[index][0]].indices[1];
+        int indexSize = 3 * (lastIndex - firstIndex + 1);
         float* vertices_ = new float[indexSize];
 
         for (size_t i = 0; i < indexSize; i++)
@@ -394,30 +419,45 @@ private:
         return result;
     }
     std::pair<ObjectInfo_t*, int> getObjectsForGroup(int index) {
+        int objectsArraySize = instancingGroups[index].size();
+        ObjectInfo_t* objectsArray = new ObjectInfo_t[objectsArraySize];
 
+        for (size_t i = 0; i < objectsArraySize; i++)
+        {
+            objectsArray[i] = objectInfo[instancingGroups[index][i]];
+        }
+        std::pair<ObjectInfo_t*, int> result{ objectsArray, objectsArraySize };
+        
+        return result;
     }
 
     std::pair<unsigned int*, int> getIndicesForCombinedGroup() {
         int indexSize = indexCount;
+
         for (size_t i = 0; i < instancingGroups.size(); i++)
         {
-            indexSize -= (objectInfo[instancingGroups[i][0]].indices[3] - objectInfo[instancingGroups[i][0]].indices[2]) * instancingGroups[i].size();
+            std::cout << objectInfo[instancingGroups[i][0]].indices[3] << std::endl;
+            std::cout << objectInfo[instancingGroups[i][0]].indices[2] << std::endl;
+            std::cout << instancingGroups[i].size() << std::endl;
+            indexSize -= (objectInfo[instancingGroups[i][0]].indices[3] - objectInfo[instancingGroups[i][0]].indices[2] + 1) * instancingGroups[i].size();
         }
         
         unsigned int* indices_ = new unsigned int[indexSize];
         int currentIndex = 0;
 
-        for (int i = 0; i < indexCount; i++)
-        {
-            for (size_t j = 0; j < instancingGroups.size(); j++)
+        if (indexSize > 0) {
+            for (int i = 0; i < indexCount; i++)
             {
-                if (i >= objectInfo[instancingGroups[j][0]].indices[2] && i <= objectInfo[instancingGroups[j][0]].indices[3]) { goto next; }
-            }
-            indices_[currentIndex] = indices[i];
-            currentIndex++;
+                for (size_t j = 0; j < instancingGroups.size(); j++)
+                {
+                    if (i >= objectInfo[instancingGroups[j][0]].indices[2] && i <= objectInfo[instancingGroups[j][0]].indices[3]) { goto next; }
+                }
+                indices_[currentIndex] = indices[i];
+                currentIndex++;
 
             next:
-            continue;
+                continue;
+            }
         }
         std::pair<unsigned int*, int> result(indices_, indexSize);
         return result;
@@ -426,29 +466,63 @@ private:
         int vertexSize = vertexCount;
         for (size_t i = 0; i < instancingGroups.size(); i++)
         {
-            vertexSize -= (objectInfo[instancingGroups[i][0]].indices[1] - objectInfo[instancingGroups[i][0]].indices[0]) * instancingGroups[i].size();
+            vertexSize -= (objectInfo[instancingGroups[i][0]].indices[1] - objectInfo[instancingGroups[i][0]].indices[0] + 1) * 3 * instancingGroups[i].size();
         }
 
         float* vertices_ = new float[vertexSize];
         int currentIndex = 0;
 
-        for (int i = 0; i < vertexCount; i++)
-        {
-            for (size_t j = 0; j < instancingGroups.size(); j++)
+        if (vertexSize > 0) {
+            for (int i = 0; i < vertexCount; i++)
             {
-                if (i >= objectInfo[instancingGroups[j][0]].indices[0] && i <= objectInfo[instancingGroups[j][0]].indices[1]) { goto next; }
-            }
-        vertices_[currentIndex] = vertices[i];
-        currentIndex++;
+                for (size_t j = 0; j < instancingGroups.size(); j++)
+                {
+                    if (i >= objectInfo[instancingGroups[j][0]].indices[0] && i <= objectInfo[instancingGroups[j][0]].indices[1]) { goto next; }
+                }
+                vertices_[currentIndex] = vertices[i];
+                currentIndex++;
 
-        next:
-        continue;
+            next:
+                continue;
+            }
         }
         std::pair<float*, int> result(vertices_, vertexSize);
         return result;
     }
-    std::pair<ObjectInfo_t*, int> getObjectsForCombinedGroup(int index) {
+    std::pair<ObjectInfo_t*, int> getObjectsForCombinedGroup() {
+        int objectsArraySize = objectCount;
+        for (size_t i = 0; i < instancingGroups.size(); i++)
+        {
+            objectsArraySize -= instancingGroups[i].size();
+        }
 
+        std::cout << "objectsArraySize: " << objectsArraySize << std::endl;
+        ObjectInfo_t* objectsArray = new ObjectInfo_t[objectsArraySize];
+
+        int currentIndex = 0;
+        if (objectsArraySize > 0) {
+            for (size_t i = 0; i < objectCount; i++)
+            {
+                for (size_t j = 0; j < instancingGroups.size(); j++)
+                {
+                    for (size_t k = 0; k < instancingGroups[j].size(); k++)
+                    {
+                        if (instancingGroups[j][k] == i) {
+                            goto next;
+                        }
+                    }
+                }
+
+                objectsArray[currentIndex++] = objectInfo[i];
+
+            next:
+                continue;
+            }
+        }
+
+        std::pair<ObjectInfo_t*, int> result{ objectsArray, objectsArraySize };
+
+        return result;
     }
 
     void copyFromArrayToArray(unsigned int* arrayToCopyTo, unsigned int* arrayToCopy, int firstIndex, int lastIndex, int startIndexInArrayToCopyTo = 0) {
@@ -485,11 +559,19 @@ private:
         }
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 
-        if (indicesDataVec.size() >= index) {
+        std::cout << "Updatebuffergroup called with index " << index << std::endl;
+        if (indicesDataVec.size() <= index) {
             indicesDataVec.push_back(std::pair<unsigned int*, int>());
             verticesDataVec.push_back(std::pair<float*, int>());
             objectDataVec.push_back(std::pair<ObjectInfo_t*, int>());
         }
+
+        delete[] indicesDataVec[index].first;
+        delete[] verticesDataVec[index].first;
+        delete[] objectDataVec[index].first;
+        indicesDataVec[index].second = 0;
+        verticesDataVec[index].second = 0;
+        objectDataVec[index].second = 0;
 
         if (index == 0) {
             indicesDataVec[index] = getIndicesForCombinedGroup();
@@ -497,10 +579,15 @@ private:
             objectDataVec[index] = getObjectsForCombinedGroup();
         }
         else {
-            indicesDataVec[index] = getIndicesForGroup(index);
-            verticesDataVec[index] = getVerticesForGroup(index);
-            objectDataVec[index] = getObjectsForGroup(index);
+            indicesDataVec[index] = getIndicesForGroup(index - 1);
+            verticesDataVec[index] = getVerticesForGroup(index - 1);
+            objectDataVec[index] = getObjectsForGroup(index - 1);
         }
+
+        std::cout << "GRAPHICS BUFFERS DATA: " << std::endl;
+        std::cout << verticesDataVec[index].second << std::endl;
+        std::cout << indicesDataVec[index].second << std::endl;
+        std::cout << objectDataVec[index].second << std::endl;
 
         //bind data
         glBindBuffer(GL_ARRAY_BUFFER, VBOs[index]);
@@ -542,14 +629,11 @@ private:
     int matchObjectMeshToKnow(Mesh mesh_) {
         for (int i = 0; i < (int)objectCount - 1; i++)
         {
-            std::cout << "i: " << i << std::endl;
             int firstVertexIndex = objectInfo[i].indices[0];
             int firstIndexIndex = objectInfo[i].indices[2];
+
             // first simple checks to minimize the amount of times we go over every vertex
             
-            //std::cout << mesh_.vertices.size() << " " << objectInfo[i].indices[1] - firstVertexIndex + 1 << std::endl;
-            //std::cout << mesh_.indices.size() << " " << objectInfo[i].indices[3] - firstIndexIndex + 1<< std::endl;
-
             if (mesh_.vertices.size() != objectInfo[i].indices[1] - firstVertexIndex + 1) { goto next; }
             if (mesh_.indices.size() != objectInfo[i].indices[3] - firstIndexIndex + 1) { goto next; }
 
@@ -558,16 +642,18 @@ private:
             {
                 for (int k = 0; k < 3; k++)
                 {
-                    //std::cout << "1: " << j << " " << k << " : " << firstVertexIndex + 3 * j + k << std::endl;
-                    //std::cout << "2: " << mesh_.vertices[j][k] << " : " << vertices[firstVertexIndex + 3 * j + k] << std::endl;
-                    if (mesh_.vertices[j][k] != vertices[firstVertexIndex + 3 * j + k]) { goto next; }
+                    //std::cout << "1: " << j << " " << k << " : " << firstVertexIndex * 3 + 3 * j + k << std::endl;
+                    //std::cout << "2: " << mesh_.vertices[j][k] << " : " << vertices[firstVertexIndex * 3 + 3 * j + k] << std::endl;
+                    if (mesh_.vertices[j][k] != vertices[firstVertexIndex * 3 + 3 * j + k]) { goto next; }
                 }
             }
 
             // check if the indices overlap
             for (size_t j = 0; j < mesh_.indices.size(); j++)
             {
-                if (mesh_.indices[j] != indices[firstIndexIndex + j - firstVertexIndex]) { goto next; }
+                //std::cout << "1: " << j << " : " << firstIndexIndex + j << std::endl;
+                //std::cout << "2: " << mesh_.indices[j] << " : " << indices[firstIndexIndex + j] - firstVertexIndex << std::endl;
+                if (mesh_.indices[j] != indices[firstIndexIndex + j] - firstVertexIndex) { goto next; }
             }
             return i;
 
