@@ -1,1 +1,13 @@
-This is my attempt at a 3D Physics Engine. Thus far it only consists of a rendering 'engine' with my weird way of minimizing draw calls.
+=============================================
+Aero 3D
+Practice project for aerodynamics en graphics.
+Also semi intended as testing ground for NUNA12 software ideas
+
+=============================================
+
+Meant to test a way of automatic instanced rendering.
+Plans are to try and simulate general fluid dynamics, with a focus on aerodynamics.
+
+=============================================
+
+Author: Ivo Blok

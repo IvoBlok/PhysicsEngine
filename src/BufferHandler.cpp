@@ -54,3 +54,11 @@ Shader& BufferHandler::createShader(bool instanceType, const char* vertexPath, c
 	}
 }
 
+void BufferHandler::draw() {
+	// draw single objects
+	// ---------
+	for (int i = 0; i < perObjectObjectInfoArray.size; i++)
+	{
+
+	}
+}
