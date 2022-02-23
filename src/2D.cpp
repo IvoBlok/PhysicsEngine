@@ -22,7 +22,7 @@ int main() {
     // glfw window creation
     // --------------------
     GLFWHandler::init();
-    GLFWwindow* window = GLFWHandler::getGLFWWindow(SCR_WIDTH, SCR_HEIGHT, "2D Physics Engine :)");
+    GLFWwindow* window = GLFWHandler::getGLFWWindow(SCR_WIDTH, SCR_HEIGHT, "3D Engine :)");
 
     // load GLAD
     // --------------------
@@ -30,22 +30,18 @@ int main() {
 
     // build and compile our shader program
     // ------------------------------------
-    Shader ourShader("../src/shaders/simple_lighting_shader.vert",
-                     "../src/shaders/simple_lighting_shader.frag",
-                     "../src/shaders/simple_lighting_shader.geom");
+    Shader instancingShader("src/shaders/shader_instancing.vert",
+                            "src/shaders/shader_instancing.frag",
+                            "src/shaders/shader_instancing.geom");
 
+    Shader  perOjbectShader("src/shaders/shader_per_object.vert",
+                            "src/shaders/shader_per_object.frag",
+                            "src/shaders/shader_per_object.geom");
+    
+    /*
     // set up vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------
-    BufferHandler bufferHandler{camera, ourShader};
-
-    EngineObject& cube1 = bufferHandler.engineObjects[bufferHandler.createEngineObject("cube")];
-    //bufferHandler.engineObjects[bufferHandler.createEngineObject("cube", glm::vec3(randomRange(-5, 5), randomRange(-5, 5), randomRange(-5, 5)), glm::vec3(1, 0, 0))];
-    //bufferHandler.engineObjects[bufferHandler.createEngineObject("cube", glm::vec3(randomRange(-5, 5), randomRange(-5, 5), randomRange(-5, 5)), glm::vec3(1, 0, 0))];
-    //bufferHandler.engineObjects[bufferHandler.createEngineObject("cube", glm::vec3(randomRange(-5, 5), randomRange(-5, 5), randomRange(-5, 5)), glm::vec3(1, 0, 0))];
-    //bufferHandler.engineObjects[bufferHandler.createEngineObject("cube", glm::vec3(randomRange(-5, 5), randomRange(-5, 5), randomRange(-5, 5)), glm::vec3(1, 0, 0))];
-
-    //EngineObject& cube2 = bufferHandler.engineObjects[bufferHandler.createEngineObject("cube")];
-    //EngineObject& cube2 = bufferHandler.engineObjects[bufferHandler.createEngineObject("test", glm::vec3(1, 1, 1), glm::vec3(1, 0, 0))];
+    BufferHandler bufferHandler{camera, instancingShader };
     
     // initialize openGL settings
     // -------------------------------------------------------------------------------------------
@@ -58,13 +54,9 @@ int main() {
     // lighting
     // ---------------------------------
     DirLightData directionalLight{ glm::vec3(-.2f, -1.f, -.3f), glm::vec3(.2f), glm::vec3(.4f)};
-    ourShader.use();
-    ourShader.setDirLight(directionalLight);
 
     // render loop
     // -----------
-
-    bool test = true;
 
     while (!glfwWindowShouldClose(window))
     {
@@ -76,7 +68,7 @@ int main() {
         if (inputs.size() != 0) {
             if (inputs.size() == 3 && !buttonPressed) {
                 directionalLight.direction = glm::vec3(inputs[0], inputs[1], inputs[2]);
-                ourShader.setDirLight(directionalLight);
+                //ourShader.setDirLight(directionalLight);
             }
             else if (inputs.size() == 1 && inputs[0] == -1 && !buttonPressed) {
                 //bufferHandler.engineObjects[bufferHandler.createEngineObject("cube", glm::vec3(randomRange(-5, 5), randomRange(-5, 5), randomRange(-5, 5)))];
@@ -112,6 +104,8 @@ int main() {
     // deallocate buffers
     // ------------------------------------------------------------------------
     bufferHandler.~BufferHandler();
+
+    */
 
     // glfw: terminate, clearing all previously allocated GLFW resources.
     // ------------------------------------------------------------------

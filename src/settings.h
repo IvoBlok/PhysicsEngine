@@ -14,7 +14,4 @@ const unsigned int INITIAL_VERTEX_BUFFER_CAPACITY = 100;
 const unsigned int INITIAL_INDEX_BUFFER_CAPACITY = 300;
 const unsigned int INITIAL_OBJECT_CAPACITY = 10;
 
-// drawing
-const bool ALLOW_INSTANCED_DRAWING = true;
-
 #endif

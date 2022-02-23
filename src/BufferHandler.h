@@ -2,10 +2,6 @@
 #define BUFFERHANDLER_H
 
 //external
-#include <ASSIMP-3.3.1/Importer.hpp>
-#include <ASSIMP-3.3.1/scene.h>
-#include <ASSIMP-3.3.1/postprocess.h>
-#include <external/stb_image.h>
 #include <GLM/gtx/string_cast.hpp>
 
 //internal
@@ -14,665 +10,79 @@
 #include "EngineObject.h"
 #include "Mesh.h"
 
-//TODO if objectMeshes change, bufferhandler should check if that object was in an instanced group and update accordingly
-//TODO instead of refreshing everything when creating a new object, update only the relevant buffers
-//TODO write getobjectsfromgroup functions.
-//! would be nice to combine the functions for getting the indices,vertices and objects per type to one function.
-//! also the current version of the above mentioned functions are horribly inefficient
-
+// main class
+// --------
 class BufferHandler {
 public:
-	float* vertices = new float[0];
-	unsigned int* indices = new unsigned int[0];
-    
-    unsigned int vertexCount, indexCount, objectCount;
+	// public variables
+	// ---------
+	Shader instancingShader;											//-> stores the shader class instance used for rendering instancing 'groups'
+	Shader perObjectShader;												//-> stores the shader class instance used for rendering the individual objects
 
-	ObjectInfo_t* objectInfo = new ObjectInfo_t[0];
-	EngineObject* engineObjects = new EngineObject[0];
+	Camera& camera;														//-> stores a reference to the camera to be used for the next frame
 
-    std::vector<std::vector<int>> instancingGroups; // every group is a vector of indices to the relevant objectinfo object
+	// basic functions
+	// ---------
+	BufferHandler(Camera& camera_);
+	~BufferHandler();
 
-	BufferHandler(Camera& camera_, Shader& shader_) : camera(camera_), shader(shader_) {
-		vertices = new float[INITIAL_VERTEX_BUFFER_CAPACITY];
-		indices = new unsigned int[INITIAL_INDEX_BUFFER_CAPACITY];
-        objectInfo = new ObjectInfo_t[INITIAL_OBJECT_CAPACITY];
-        engineObjects = new EngineObject[INITIAL_OBJECT_CAPACITY];
+	Shader& createShader(bool instanceType, const char* vertexPath, const char* fragmentPath, const char* geometryPath);
 
-		vertexCount = indexCount = objectCount = 0;
-	};
 
-	// function responsible for creating a new engine object, loading the model data, classifying it as instanced or not and updating the buffers
-	unsigned int createEngineObject(std::string objectType, glm::vec3 position = glm::vec3(0.f), glm::vec3 color = glm::vec3(1.f)) {
+	// complex functions
+	// ---------
+	void draw();			
 
-        Mesh mesh = getPrimaryShapeMesh(objectType);
-        if (mesh.vertices.size() == 0) { return NULL; }
+	EngineObject& createObject(objectTypes type_);
 
-        addObjectDataSlot();
-
-        // check if the new object can be drawn as an instance of others
-        int matchingObjectIndex = matchObjectMeshToKnow(mesh);
-        if (matchingObjectIndex != -1 && ALLOW_INSTANCED_DRAWING) {
-            int groupIndex = findValueInNestedVector(matchingObjectIndex);
-            if (groupIndex != NULL) {
-                instancingGroups[groupIndex].push_back(objectCount - 1);
-            }
-            else {
-                instancingGroups.push_back(std::vector<int>{});
-                instancingGroups[instancingGroups.size() - 1].push_back(matchingObjectIndex);
-                instancingGroups[instancingGroups.size() - 1].push_back(objectCount - 1);
-            }
-            
-
-            objectInfo[objectCount - 1].indices = objectInfo[matchingObjectIndex].indices;
-        }
-        std::vector<int> indices = addToArrays(mesh);
-        objectInfo[objectCount - 1].indices = glm::vec4(indices[0], indices[1], indices[2], indices[3]);
-        
-        // Update the object and objectinfo arrays
-        objectInfo[objectCount - 1].color = glm::vec4(color, 0);
-        objectInfo[objectCount - 1].geometryMatrix = glm::translate(glm::mat4(1), position);
-
-        engineObjects[objectCount - 1].objectInfoIndex = objectCount - 1;
-
-        updateBuffers();
-        
-        // return the new engine object
-        return objectCount - 1;
-	};
-
-	void updateBuffers() {
-        // first go over all instancing groups
-        // ---------------------------------
-        for (size_t i = 0; i < instancingGroups.size(); i++)
-        {
-            updateBufferGroup(i + 1);
-        }
-        // update main buffer group
-        // ---------------------------------
-        updateBufferGroup(0);
-
-        /*
-        //configure the uniform buffer objects
-        // ---------------------------------
-        // first. We get the relevant block indices
-        unsigned int uniformBlockIndexMatrices = glGetUniformBlockIndex(shader.ID, "Matrices");
-        // Now actually create the buffer
-        if (!UBOInitialized) {
-            glGenBuffers(1, &UBO);
-            glBufferData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), NULL, GL_STATIC_DRAW);
-            UBOInitialized = true;
-        }
-        glBindBuffer(GL_UNIFORM_BUFFER, UBO);
-        // then we link each shader's uniform block to this uniform binding point
-        glUniformBlockBinding(shader.ID, uniformBlockIndexMatrices, 0);
-        std::cout << (glGetError());
-
-        glBindBufferRange(GL_UNIFORM_BUFFER, 0, UBO, 0, 2 * sizeof(glm::mat4));
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-        std::cout << (glGetError());
-
-        glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection));
-        glBindBuffer(GL_UNIFORM_BUFFER, 0);
-        */
-        //configure the uniform buffer objects
-        if (!UBOInitialized) {
-            unsigned int uniformBlockIndexMatrices = glGetUniformBlockIndex(shader.ID, "Matrices");
-            // then we link each shader's uniform block to this uniform binding point
-            glUniformBlockBinding(shader.ID, uniformBlockIndexMatrices, 0);
-            // Now actually create the buffer
-            glGenBuffers(1, &UBO);
-            glBindBuffer(GL_UNIFORM_BUFFER, UBO);
-            glBufferData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), NULL, GL_STATIC_DRAW);
-            glBindBuffer(GL_UNIFORM_BUFFER, 0);
-            // define the range of the buffer that links to a uniform binding point
-            glBindBufferRange(GL_UNIFORM_BUFFER, 0, UBO, 0, 2 * sizeof(glm::mat4));
-
-            // calculate projection matrix
-            projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-
-            // store the projection matrix
-            glBindBuffer(GL_UNIFORM_BUFFER, UBO);
-            glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection));
-            glBindBuffer(GL_UNIFORM_BUFFER, 0);
-
-            UBOInitialized = true;
-        }
-    };
-
-    // function responsible for executing the sorted draw operations. a potentially large list of instanced draw calls and a final draw call for the leftovers
-    void draw() {
-        /* OLD ?
-        glm::mat4 view = camera.GetViewMatrix();
-        glBindBuffer(GL_UNIFORM_BUFFER, UBO);
-        glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
-        glBindBuffer(GL_UNIFORM_BUFFER, 0);
-
-        shader.setVec3("viewPos", camera.Position);
-
-        // render boxes
-        glBindVertexArray(VAO);
-        
-        //ourShader.setBool("instancing", true);
-        //glDrawElementsInstanced(GL_TRIANGLES, (GLsizei)(sizeof(indices) / sizeof(*indices)), GL_UNSIGNED_INT, 0, (GLsizei)(sizeof(cubePositions) / sizeof(*cubePositions)));
-        
-        glDrawElements(GL_TRIANGLES, (GLsizei)indexCount, GL_UNSIGNED_INT, 0); */
-        // NEW?
-        
-        // DEBUG
-        /*
-        std::cout << std::endl << "DEBUG RENDER VALUES MAIN GROUP " << std::endl;
-        std::cout << "indices: " << std::endl;
-        for (int i = 0; i < indicesDataVec[0].second; i++)
-        {
-            std::cout << indicesDataVec[0].first[i] << std::endl;
-        }
-        std::cout << "vertices: " << std::endl;
-        for (int i = 0; i < verticesDataVec[0].second; i++)
-        {
-            std::cout << verticesDataVec[0].first[i] << std::endl;
-        }*/
-
-        
-        frame++;
-        view = camera.GetViewMatrix();
-        glBindBuffer(GL_UNIFORM_BUFFER, UBO);
-        glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
-
-        if (objectDataVec[0].second > 0) {
-
-            glBindVertexArray(VAOs[0]);
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-
-            glBindBuffer(GL_ARRAY_BUFFER, VBOs[0]);
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBOs[0]);
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, SSBOs[0]);
-
-            shader.setBool("instancing", false);
-
-            glDrawElements(GL_TRIANGLES, (GLsizei)indicesDataVec[0].second, GL_UNSIGNED_INT, 0);
-        }
-        
-        
-        for (size_t i = 0; i < instancingGroups.size(); i++)
-        {
-            glBindVertexArray(VAOs[i + 1]);
-            glBindBuffer(GL_ARRAY_BUFFER, VBOs[i + 1]);
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBOs[i + 1]);
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, SSBOs[i + 1]);
-
-            glDrawElementsInstanced(GL_TRIANGLES, indicesDataVec[i + 1].second, GL_UNSIGNED_INT, 0, (GLsizei)objectDataVec[i + 1].second);
-        }
-        
-    }
-
-    ~BufferHandler() {
-        for (size_t i = 0; i < VBOs.size(); i++)
-        {
-            glDeleteVertexArrays(1, &VAOs[i]);
-            glDeleteBuffers(1, &VBOs[i]);
-            glDeleteBuffers(1, &EBOs[i]);
-            glDeleteBuffers(1, &SSBOs[i]);
-        }
-
-        glDeleteBuffers(1, &UBO);
-
-        /* I got no clue why this gives a 'break' error
-        delete[] vertices;
-        delete[] indices;
-        delete[] objectInfo;
-        delete[] engineObjects;
-        */
-    }
+	// object functions
+	// ---------
+	void moveObject(EngineObject&);
+	void removeObject(EngineObject&);
 
 private:
-    int vertexCapacity = INITIAL_VERTEX_BUFFER_CAPACITY; int indexCapacity = INITIAL_INDEX_BUFFER_CAPACITY; int objectCapacity = INITIAL_OBJECT_CAPACITY;
-	Camera& camera;
-    Shader& shader;
-    std::vector<unsigned int> VBOs;
-    std::vector<unsigned int> EBOs;
-    std::vector<unsigned int> VAOs;
-    std::vector<unsigned int> SSBOs;
-    unsigned int UBO;
-    bool UBOInitialized;
+	// private variables
+	// ---------
+	int frame = 0;														//-> stores the unique index of the frame being worked on
+	glm::mat4 view;														//-> stores (temporarily) the view matrix
+	glm::mat4 projection;												//-> stores (temporarily) the projection matrix
+	std::vector<EngineObject> engineObjects;							//-> stores all existing loaded engine objects in the scene
+
+	// instancing variables
+	// ---------
+	std::vector<objectTypes> instancingTypes;							//-> stores the object types that will be rendered by instancing
+
+	std::vector<dynamicFloatArrayData> instancingVerticesVector;		//-> stores per instancing group the vertices, the count and capacity
+	std::vector<dynamicIntArrayData> instancingIndicesVector;			//-> stores per instancing group the indices, the count and capacity
+	std::vector<dynamicObjectInfoArrayData> instancingObjectInfoVector;	//-> stores per instancing group the objectInfo structs
+
+	std::vector<unsigned int> instancingVBOs;
+	std::vector<unsigned int> instancingEBOs;
+	std::vector<unsigned int> instancingVAOs;
+	std::vector<unsigned int> instancingSSBOs;
+	std::vector<unsigned int> instancingUBOs;
+
+	// per object variables
+	// ---------
+	std::vector<objectTypes> perObjectTypes;							//-> stores the object types that will be rendered one by one
+
+	std::vector<dynamicFloatArrayData> perObjectVerticesVector;			//-> stores per object the vertices, the count and capacity
+	std::vector<dynamicIntArrayData> perObjectIndicesVector;			//-> stores per object the indices, the count and capacity
+	dynamicObjectInfoArrayData perObjectObjectInfoArray;				//-> stores per object the objectInfo struct
+
+	std::vector<unsigned int> perObjectVBOs;
+	std::vector<unsigned int> perObjectEBOs;
+	std::vector<unsigned int> perObjectVAOs;
+	std::vector<unsigned int> perObjectSSBOs;
+	std::vector<unsigned int> perObjectUBOs;
+
+	// basic functions
+	// ---------
+	
+
+	// complex functions
+	// ---------
 
-    std::vector<std::pair<unsigned int*, int>> indicesDataVec;
-    std::vector<std::pair<float*, int>> verticesDataVec;
-    std::vector<std::pair<ObjectInfo_t*, int>> objectDataVec;
-
-    int frame = 0;
-    glm::mat4 view;
-    glm::mat4 projection;
-
-    std::vector<int> addToArrays(Mesh& mesh) {
-        std::vector<int> returnValues;
-
-        //TODO: IMPLEMENT SYSTEM TO CHECK IF THE NEW VERTICES AREN'T ALREADY IN THE VERTEX BUFFER, IF SO THE INDICES CORRESPONDING TO THAT VERTEX NEED TO BE CHANGED
-        float* tempVertices;
-        unsigned int* tempIndices;
-
-        int newIndexValuesCount = (int)mesh.indices.size();
-        int newVertexValuesCount = (int)mesh.vertices.size() * 3; // multiply by 3 to compensate for the fact that mesh.vertices is stored as a vec3, and bufferhandler vertices in float array
-
-        // Vertices
-        // ==================================
-        // If the max capacity of the array has been reached, update the array to be longer and copy over the old values
-        if ((int)vertexCount + newVertexValuesCount > vertexCapacity) {
-            std::cout << "vertex capacity reached" << std::endl;
-            vertexCapacity *= 2;
-            tempVertices = new float[vertexCapacity];
-            for (int i = 0; i < (int)vertexCount; i++)
-            {
-                tempVertices[i] = vertices[i];
-            }
-            delete[] vertices;
-            vertices = tempVertices;
-            tempVertices = nullptr;
-        }
-        //! All vertices of an object need to be besides each other
-        returnValues.push_back(vertexCount / 3); // This will be the index to the first vertex in the new object
-        returnValues.push_back((vertexCount + newVertexValuesCount) / 3 - 1); // This will be the index to the last vertex of the new object
-        // Copy over the new values
-
-        for (int i = vertexCount; i < (int)vertexCount + newVertexValuesCount; i += 3) // go over every position with an increase of 3 every cycle to make the indexing easier
-        {
-            for (int j = 0; j < 3; j++)
-            {
-               // std::cout << i + j << " : " << i - vertexCount << " " << j << std::endl;
-                vertices[i + j] = mesh.vertices[((size_t)i - (size_t)vertexCount)/3][j];
-            }
-        }
-
-        // Indices
-        // ==================================
-        // If the max capacity of the array has been reached, update the array to be longer and copy over the old values
-        if ((int)indexCount + newIndexValuesCount > indexCapacity) {
-            std::cout << "index capacity reached" << std::endl;
-            indexCapacity *= 2;
-            tempIndices = new unsigned int[indexCapacity];
-            for (int i = 0; i < (int)indexCount; i++)
-            {
-                tempIndices[i] = indices[i];
-            }
-            delete[] indices;
-            indices = tempIndices;
-            tempIndices = nullptr;
-        }
-        // Copy over the new values
-        for (int i = indexCount; i < (int)indexCount + newIndexValuesCount; i++) // go over every index value
-        {
-            indices[i] = mesh.indices[(size_t)i - (size_t)indexCount] + vertexCount/3; // the old VertexCount is added cause THE INDEX THAT IS WRITTEN TO THE INDEX BUFFER NEEDS TO BE UPDATED, AS THE VERTICES THEY WERE REFERRING TO DONT (HAVE TO) START AT INDEX 0
-        }
-
-        returnValues.push_back(indexCount); // This will be the index to the first vertex in the new object
-        returnValues.push_back(indexCount + newIndexValuesCount - 1); // This will be the index to the last vertex of the new object
-        // Update the new Count
-        indexCount += newIndexValuesCount;
-        vertexCount += newVertexValuesCount;
-
-        return returnValues;
-    };
-
-    Mesh getPrimaryShapeMesh(std::string type) {
-        if (type == "cube") {
-            std::vector<float> vertices = {
-                // positions      
-                 0.5f,  0.5f, -0.5f,
-                 0.5f, -0.5f, -0.5f,
-                -0.5f, -0.5f, -0.5f,
-                -0.5f,  0.5f, -0.5f,
-
-                 0.5f,  0.5f,  0.5f,
-                 0.5f, -0.5f,  0.5f,
-                -0.5f, -0.5f,  0.5f,
-                -0.5f,  0.5f,  0.5f,
-            };
-
-            std::vector<unsigned int> indices = {
-                3, 1, 0, // back side
-                3, 2, 1,
-
-                4, 5, 7, // front side
-                5, 6, 7,
-
-                4, 3, 0, // y+ side
-                4, 7, 3,
-
-                1, 2, 5, // y- side
-                2, 6, 5,
-
-                0, 1, 4,// x+ side
-                1, 5, 4,
-
-                7, 2, 3,// x- side
-                7, 6, 2,
-            };
-            Mesh mesh{vertices, indices};
-            
-            return mesh;
-        }
-        if (type == "test") {
-            std::vector<float> vertices = {
-                // positions      
-                 0.5f,  0.5f, -0.2f,
-                 0.5f, -0.5f, -0.5f,
-                -0.5f, -0.5f, -0.5f,
-                -0.5f,  0.5f, -0.5f,
-
-                 0.5f,  0.5f,  0.5f,
-                 0.5f, -0.5f,  0.5f,
-                -0.5f, -0.5f,  0.5f,
-                -0.5f,  0.5f,  0.5f,
-            };
-
-            std::vector<unsigned int> indices = {
-                3, 1, 0, // back side
-                3, 2, 1,
-
-                4, 5, 7, // front side
-                5, 6, 7,
-
-                4, 3, 0, // y+ side
-                4, 7, 3,
-
-                1, 2, 5, // y- side
-                2, 6, 5,
-
-                0, 1, 4,// x+ side
-                1, 5, 4,
-
-                7, 2, 3,// x- side
-                7, 6, 2,
-            };
-            Mesh mesh{ vertices, indices };
-
-            return mesh;
-        }
-    }
-
-    std::pair<unsigned int*, int> getIndicesForGroup(int index) {
-        int firstIndex = objectInfo[instancingGroups[index][0]].indices[2];
-        int lastIndex = objectInfo[instancingGroups[index][0]].indices[3];
-        int indexSize = lastIndex - firstIndex + 1;
-        unsigned int* indices_ = new unsigned int[indexSize];
-
-        std::cout << "indices group: " << index << " index group: " << indexSize << std::endl;
-
-        for (size_t i = 0; i < indexSize; i++)
-        {
-            indices_[i] = indices[firstIndex + i];
-        }
-        std::pair<unsigned int*, int> result(indices_, indexSize);
-        return result;
-    }
-    std::pair<float*, int> getVerticesForGroup(int index) {
-
-        int firstIndex = objectInfo[instancingGroups[index][0]].indices[0];
-        int lastIndex = objectInfo[instancingGroups[index][0]].indices[1];
-        int indexSize = 3 * (lastIndex - firstIndex + 1);
-        float* vertices_ = new float[indexSize];
-
-        for (size_t i = 0; i < indexSize; i++)
-        {
-            vertices_[i] = vertices[firstIndex + i];
-        }
-        std::pair<float*, int> result(vertices_, indexSize);
-        return result;
-    }
-    std::pair<ObjectInfo_t*, int> getObjectsForGroup(int index) {
-        int objectsArraySize = instancingGroups[index].size();
-        ObjectInfo_t* objectsArray = new ObjectInfo_t[objectsArraySize];
-
-        for (size_t i = 0; i < objectsArraySize; i++)
-        {
-            objectsArray[i] = objectInfo[instancingGroups[index][i]];
-        }
-        std::pair<ObjectInfo_t*, int> result{ objectsArray, objectsArraySize };
-        
-        return result;
-    }
-
-    std::pair<unsigned int*, int> getIndicesForCombinedGroup() {
-        int indexSize = indexCount;
-
-        for (size_t i = 0; i < instancingGroups.size(); i++)
-        {
-            std::cout << objectInfo[instancingGroups[i][0]].indices[3] << std::endl;
-            std::cout << objectInfo[instancingGroups[i][0]].indices[2] << std::endl;
-            std::cout << instancingGroups[i].size() << std::endl;
-            indexSize -= (objectInfo[instancingGroups[i][0]].indices[3] - objectInfo[instancingGroups[i][0]].indices[2] + 1) * instancingGroups[i].size();
-        }
-        
-        unsigned int* indices_ = new unsigned int[indexSize];
-        int currentIndex = 0;
-
-        if (indexSize > 0) {
-            for (int i = 0; i < indexCount; i++)
-            {
-                for (size_t j = 0; j < instancingGroups.size(); j++)
-                {
-                    if (i >= objectInfo[instancingGroups[j][0]].indices[2] && i <= objectInfo[instancingGroups[j][0]].indices[3]) { goto next; }
-                }
-                indices_[currentIndex] = indices[i];
-                currentIndex++;
-
-            next:
-                continue;
-            }
-        }
-        std::pair<unsigned int*, int> result(indices_, indexSize);
-        return result;
-    }
-    std::pair<float*, int> getVerticesForCombinedGroup() {
-        int vertexSize = vertexCount;
-        for (size_t i = 0; i < instancingGroups.size(); i++)
-        {
-            vertexSize -= (objectInfo[instancingGroups[i][0]].indices[1] - objectInfo[instancingGroups[i][0]].indices[0] + 1) * 3 * instancingGroups[i].size();
-        }
-
-        float* vertices_ = new float[vertexSize];
-        int currentIndex = 0;
-
-        if (vertexSize > 0) {
-            for (int i = 0; i < vertexCount; i++)
-            {
-                for (size_t j = 0; j < instancingGroups.size(); j++)
-                {
-                    if (i >= objectInfo[instancingGroups[j][0]].indices[0] && i <= objectInfo[instancingGroups[j][0]].indices[1]) { goto next; }
-                }
-                vertices_[currentIndex] = vertices[i];
-                currentIndex++;
-
-            next:
-                continue;
-            }
-        }
-        std::pair<float*, int> result(vertices_, vertexSize);
-        return result;
-    }
-    std::pair<ObjectInfo_t*, int> getObjectsForCombinedGroup() {
-        int objectsArraySize = objectCount;
-        for (size_t i = 0; i < instancingGroups.size(); i++)
-        {
-            objectsArraySize -= instancingGroups[i].size();
-        }
-
-        std::cout << "objectsArraySize: " << objectsArraySize << std::endl;
-        ObjectInfo_t* objectsArray = new ObjectInfo_t[objectsArraySize];
-
-        int currentIndex = 0;
-        if (objectsArraySize > 0) {
-            for (size_t i = 0; i < objectCount; i++)
-            {
-                for (size_t j = 0; j < instancingGroups.size(); j++)
-                {
-                    for (size_t k = 0; k < instancingGroups[j].size(); k++)
-                    {
-                        if (instancingGroups[j][k] == i) {
-                            goto next;
-                        }
-                    }
-                }
-
-                objectsArray[currentIndex++] = objectInfo[i];
-
-            next:
-                continue;
-            }
-        }
-
-        std::pair<ObjectInfo_t*, int> result{ objectsArray, objectsArraySize };
-
-        return result;
-    }
-
-    void copyFromArrayToArray(unsigned int* arrayToCopyTo, unsigned int* arrayToCopy, int firstIndex, int lastIndex, int startIndexInArrayToCopyTo = 0) {
-        for (size_t i = firstIndex; i <= lastIndex - firstIndex; i++)
-        {
-            arrayToCopyTo[startIndexInArrayToCopyTo + i] = arrayToCopy[firstIndex + i];
-        }
-    }
-    void copyFromArrayToArray(float* arrayToCopyTo, float* arrayToCopy, int firstIndex, int lastIndex, int startIndexInArrayToCopyTo = 0) {
-        for (size_t i = firstIndex; i <= lastIndex - firstIndex; i++)
-        {
-            arrayToCopyTo[startIndexInArrayToCopyTo + i] = arrayToCopy[firstIndex + i];
-        }
-    }
-
-    void updateBufferGroup(int index) {
-
-        // if the group is new, create the buffers
-        if (VBOs.size() <= index) {
-            unsigned int VAO, VBO, EBO, SSBO;
-
-            glGenVertexArrays(1, &VAO);
-            glGenBuffers(1, &VBO);
-            glGenBuffers(1, &EBO);
-            glGenBuffers(1, &SSBO);
-            glBindVertexArray(VAO);
-
-            VAOs.push_back(VAO);
-            VBOs.push_back(VBO);
-            EBOs.push_back(EBO);
-            SSBOs.push_back(SSBO);
-
-            glEnableVertexAttribArray(0);
-        }
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-
-        std::cout << "Updatebuffergroup called with index " << index << std::endl;
-        if (indicesDataVec.size() <= index) {
-            indicesDataVec.push_back(std::pair<unsigned int*, int>());
-            verticesDataVec.push_back(std::pair<float*, int>());
-            objectDataVec.push_back(std::pair<ObjectInfo_t*, int>());
-        }
-
-        delete[] indicesDataVec[index].first;
-        delete[] verticesDataVec[index].first;
-        delete[] objectDataVec[index].first;
-        indicesDataVec[index].second = 0;
-        verticesDataVec[index].second = 0;
-        objectDataVec[index].second = 0;
-
-        if (index == 0) {
-            indicesDataVec[index] = getIndicesForCombinedGroup();
-            verticesDataVec[index] = getVerticesForCombinedGroup();
-            objectDataVec[index] = getObjectsForCombinedGroup();
-        }
-        else {
-            indicesDataVec[index] = getIndicesForGroup(index - 1);
-            verticesDataVec[index] = getVerticesForGroup(index - 1);
-            objectDataVec[index] = getObjectsForGroup(index - 1);
-        }
-
-        std::cout << "GRAPHICS BUFFERS DATA: " << std::endl;
-        std::cout << verticesDataVec[index].second << std::endl;
-        std::cout << indicesDataVec[index].second << std::endl;
-        std::cout << objectDataVec[index].second << std::endl;
-
-        //bind data
-        glBindBuffer(GL_ARRAY_BUFFER, VBOs[index]);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(float) * verticesDataVec[index].second, verticesDataVec[index].first, GL_STATIC_DRAW);
-
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBOs[index]);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * indicesDataVec[index].second, indicesDataVec[index].first, GL_STATIC_DRAW);
-
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, SSBOs[index]);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(ObjectInfo_t) * objectDataVec[index].second, objectDataVec[index].first, GL_DYNAMIC_COPY);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, SSBOs[index]);
-    }
-
-    void addObjectDataSlot() {
-        ObjectInfo_t* tempObjectInfo;
-        EngineObject* tempEngineObjects;
-
-        if ((int)objectCount + 1 > objectCapacity) {
-            std::cout << "object capacity reached" << std::endl;
-            objectCapacity *= 2;
-            tempObjectInfo = new ObjectInfo_t[objectCapacity];
-            tempEngineObjects = new EngineObject[objectCapacity];
-            for (int i = 0; i < (int)objectCount; i++)
-            {
-                tempObjectInfo[i] = objectInfo[i];
-                tempEngineObjects[i] = engineObjects[i];
-            }
-            delete[] objectInfo;
-            delete[] engineObjects;
-            objectInfo = tempObjectInfo;
-            engineObjects = tempEngineObjects;
-
-            tempObjectInfo = nullptr;
-            tempEngineObjects = nullptr;
-        }
-        objectCount++;
-    }
-
-    int matchObjectMeshToKnow(Mesh mesh_) {
-        for (int i = 0; i < (int)objectCount - 1; i++)
-        {
-            int firstVertexIndex = objectInfo[i].indices[0];
-            int firstIndexIndex = objectInfo[i].indices[2];
-
-            // first simple checks to minimize the amount of times we go over every vertex
-            
-            if (mesh_.vertices.size() != objectInfo[i].indices[1] - firstVertexIndex + 1) { goto next; }
-            if (mesh_.indices.size() != objectInfo[i].indices[3] - firstIndexIndex + 1) { goto next; }
-
-            // check if the vertices overlap
-            for (size_t j = 0; j < mesh_.vertices.size(); j++)
-            {
-                for (int k = 0; k < 3; k++)
-                {
-                    //std::cout << "1: " << j << " " << k << " : " << firstVertexIndex * 3 + 3 * j + k << std::endl;
-                    //std::cout << "2: " << mesh_.vertices[j][k] << " : " << vertices[firstVertexIndex * 3 + 3 * j + k] << std::endl;
-                    if (mesh_.vertices[j][k] != vertices[firstVertexIndex * 3 + 3 * j + k]) { goto next; }
-                }
-            }
-
-            // check if the indices overlap
-            for (size_t j = 0; j < mesh_.indices.size(); j++)
-            {
-                //std::cout << "1: " << j << " : " << firstIndexIndex + j << std::endl;
-                //std::cout << "2: " << mesh_.indices[j] << " : " << indices[firstIndexIndex + j] - firstVertexIndex << std::endl;
-                if (mesh_.indices[j] != indices[firstIndexIndex + j] - firstVertexIndex) { goto next; }
-            }
-            return i;
-
-            next:
-            continue;
-        }
-        return -1;
-    }
-
-    int findValueInNestedVector(int index) {
-        for (size_t i = 0; i < instancingGroups.size(); i++)
-        {
-            for (size_t j = 0; j < instancingGroups[i].size(); j++)
-            {
-                if (instancingGroups[i][j] == index) { return i; }
-            }
-        }
-        return NULL;
-    }
 };
 
 #endif

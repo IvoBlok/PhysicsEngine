@@ -24,6 +24,9 @@
     <ClCompile Include="src\external\stb_image.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\BufferHandler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\shaders\Shader.h">
@@ -58,8 +61,11 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="src\shaders\simple_lighting_shader.frag" />
-    <None Include="src\shaders\simple_lighting_shader.vert" />
-    <None Include="src\shaders\simple_lighting_shader.geom" />
+    <None Include="src\shaders\shader_instancing.frag" />
+    <None Include="src\shaders\shader_instancing.vert" />
+    <None Include="src\shaders\shader_instancing.geom" />
+    <None Include="src\shaders\shader_per_object.frag" />
+    <None Include="src\shaders\shader_per_object.geom" />
+    <None Include="src\shaders\shader_per_object.vert" />
   </ItemGroup>
 </Project>

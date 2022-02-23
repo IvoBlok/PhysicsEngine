@@ -167,6 +167,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\BufferHandler.cpp" />
     <ClCompile Include="src\external\glad.c" />
     <ClCompile Include="src\2D.cpp" />
     <ClCompile Include="src\external\stb_image.cpp" />
@@ -184,9 +185,12 @@
     <ClInclude Include="src\TimeHandler.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="src\shaders\simple_lighting_shader.frag" />
-    <None Include="src\shaders\simple_lighting_shader.geom" />
-    <None Include="src\shaders\simple_lighting_shader.vert" />
+    <None Include="src\shaders\shader_instancing.frag" />
+    <None Include="src\shaders\shader_instancing.geom" />
+    <None Include="src\shaders\shader_instancing.vert" />
+    <None Include="src\shaders\shader_per_object.frag" />
+    <None Include="src\shaders\shader_per_object.geom" />
+    <None Include="src\shaders\shader_per_object.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
