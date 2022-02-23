@@ -167,7 +167,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\BufferHandler.cpp" />
     <ClCompile Include="src\external\glad.c" />
     <ClCompile Include="src\2D.cpp" />
     <ClCompile Include="src\external\stb_image.cpp" />

@@ -5,6 +5,7 @@
 
 // internal
 #include "MathFunctions.h"
+#include "settings.h"
 
 #include "GLFWHandler.h"
 #include "TimeHandler.h"
@@ -28,28 +29,39 @@ int main() {
     // --------------------
     GLFWHandler::loadGLAD();
 
-    // build and compile our shader program
-    // ------------------------------------
-    Shader instancingShader("src/shaders/shader_instancing.vert",
-                            "src/shaders/shader_instancing.frag",
-                            "src/shaders/shader_instancing.geom");
-
-    Shader  perOjbectShader("src/shaders/shader_per_object.vert",
-                            "src/shaders/shader_per_object.frag",
-                            "src/shaders/shader_per_object.geom");
+    // Setup shaders and bufferhandler
+    // ------------------------------------------------------------------
+    BufferHandler bufferHandler;
     
-    /*
+    Shader& instancingShader = bufferHandler.createShader(
+        true,
+        "src/shaders/shader_instancing.vert",
+        "src/shaders/shader_instancing.frag",
+        "src/shaders/shader_instancing.geom"
+    );
+
+    Shader& perOjbectShader = bufferHandler.createShader(
+        false,
+        "src/shaders/shader_per_object.vert",
+        "src/shaders/shader_per_object.frag",
+        "src/shaders/shader_per_object.geom"
+    );
+
     // set up vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------
-    BufferHandler bufferHandler{camera, instancingShader };
-    
+
+
+
     // initialize openGL settings
-    // -------------------------------------------------------------------------------------------
+    // ------------------------------------------------------------------
+
     
     glEnable(GL_DEPTH_TEST);
     glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);
     glEnable(GL_CULL_FACE);
     glCullFace(GL_FRONT);
+
+    /*
 
     // lighting
     // ---------------------------------

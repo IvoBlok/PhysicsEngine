@@ -25,6 +25,10 @@ public:
     // construct reads and builds the shader
     Shader(const char* vertexPath = nullptr, const char* fragmentPath = nullptr, const char* geometryPath = nullptr)
     {
+        if (vertexPath == nullptr || fragmentPath == nullptr || geometryPath == nullptr) {
+            ID = -1;
+            return;
+        }
         // 1. retrieve the vertex/fragment source code from filePath
         std::string vertexCode;
         std::string fragmentCode;

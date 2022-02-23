@@ -17,8 +17,8 @@ struct dynamicIntArrayData {
 	int size;
 	int capacity;
 };
-struct dynamicFloatArrayData {
-	float* data;
+struct dynamicVec3ArrayData {
+	glm::vec3* data;
 	int size;
 	int capacity;
 };
