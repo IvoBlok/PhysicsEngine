@@ -1,6 +1,6 @@
 =============================================
 
-Aero 3D
+Aero 3D \n
 Practice project for aerodynamics en graphics.
 Also semi intended as testing ground for NUNA12 software ideas
 
