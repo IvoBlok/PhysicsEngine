@@ -13,7 +13,7 @@ layout (location = 0) in vec3 aPos;
 // in / out
 // -----------
 out int objectInfoIndexList; //1 value, but it goes to the geometry shader, so it's called a list because in the geom shader it will be
-in int objectInfoIndex;
+uniform int objectInfoIndex;
 
 // buffers
 // -----------

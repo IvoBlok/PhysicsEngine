@@ -21,51 +21,53 @@ bool buttonPressed = false;
 
 int main() {
     // glfw window creation
-    // --------------------
+    // -----------
     GLFWHandler::init();
     GLFWwindow* window = GLFWHandler::getGLFWWindow(SCR_WIDTH, SCR_HEIGHT, "3D Engine :)");
 
     // load GLAD
-    // --------------------
+    // -----------
     GLFWHandler::loadGLAD();
 
     // Setup shaders and bufferhandler
-    // ------------------------------------------------------------------
-    BufferHandler bufferHandler;
+    // -----------
+    BufferHandler bufferHandler{};
     
     Shader& instancingShader = bufferHandler.createShader(
         true,
-        "src/shaders/shader_instancing.vert",
-        "src/shaders/shader_instancing.frag",
-        "src/shaders/shader_instancing.geom"
+        "../src/shaders/shader_instancing.vert",
+        "../src/shaders/shader_instancing.frag",
+        "../src/shaders/shader_instancing.geom"
     );
 
-    Shader& perOjbectShader = bufferHandler.createShader(
+    Shader& perObjectShader = bufferHandler.createShader(
         false,
-        "src/shaders/shader_per_object.vert",
-        "src/shaders/shader_per_object.frag",
-        "src/shaders/shader_per_object.geom"
+        "../src/shaders/shader_per_object.vert",
+        "../src/shaders/shader_per_object.frag",
+        "../src/shaders/shader_per_object.geom"
     );
-
-    // set up vertex data (and buffer(s)) and configure vertex attributes
-    // ------------------------------------------------------------------
-
-
 
     // initialize openGL settings
-    // ------------------------------------------------------------------
+    // -----------
 
-    
     glEnable(GL_DEPTH_TEST);
     glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);
     glEnable(GL_CULL_FACE);
     glCullFace(GL_FRONT);
 
-    /*
-
     // lighting
-    // ---------------------------------
+    // -----------
     DirLightData directionalLight{ glm::vec3(-.2f, -1.f, -.3f), glm::vec3(.2f), glm::vec3(.4f)};
+    bufferHandler.setDirLight(directionalLight);
+
+    // objects
+    // -----------
+    bufferHandler.createObject(objectTypes::CUBE);
+    bufferHandler.createObject(objectTypes::CUBE);
+    bufferHandler.createObject(objectTypes::CUBE);
+    bufferHandler.createObject(objectTypes::CUBE);
+    bufferHandler.createObject(objectTypes::CUBE);
+    bufferHandler.createObject(objectTypes::CUBE);
 
     // render loop
     // -----------
@@ -77,25 +79,6 @@ int main() {
         // input
         // -----------
         std::vector<float> inputs = processInput(window);
-        if (inputs.size() != 0) {
-            if (inputs.size() == 3 && !buttonPressed) {
-                directionalLight.direction = glm::vec3(inputs[0], inputs[1], inputs[2]);
-                //ourShader.setDirLight(directionalLight);
-            }
-            else if (inputs.size() == 1 && inputs[0] == -1 && !buttonPressed) {
-                //bufferHandler.engineObjects[bufferHandler.createEngineObject("cube", glm::vec3(randomRange(-5, 5), randomRange(-5, 5), randomRange(-5, 5)))];
-                bufferHandler.engineObjects[bufferHandler.createEngineObject("test", glm::vec3(randomRange(-5, 5), randomRange(-5, 5), randomRange(-5, 5)), glm::vec3(1, 0, 0))];
-            }
-            else if (inputs.size() == 1 && inputs[0] == -2 && !buttonPressed) {
-                bufferHandler.engineObjects[bufferHandler.createEngineObject("cube", glm::vec3(randomRange(-5, 5), randomRange(-5, 5), randomRange(-5, 5)), glm::vec3(1, 0, 0))];
-            }
-            buttonPressed = true;
-        }
-        else {
-            buttonPressed = false;
-        }
-
-        //std::cout << "Objects: " << bufferHandler.objectCount << "   FPS: " << 1 / deltaTime << std::endl;
 
         // render
         // -----------
@@ -106,8 +89,9 @@ int main() {
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -----------
-        if (glGetError() != 0) {
-            std::cout << "glError: " << glGetError() << std::endl;
+        int error = glGetError();
+        if (error != 0) {
+            std::cout << "glError: " << error << std::endl;
         }
         
         glfwSwapBuffers(window);
@@ -116,8 +100,6 @@ int main() {
     // deallocate buffers
     // ------------------------------------------------------------------------
     bufferHandler.~BufferHandler();
-
-    */
 
     // glfw: terminate, clearing all previously allocated GLFW resources.
     // ------------------------------------------------------------------
