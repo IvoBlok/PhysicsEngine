@@ -16,5 +16,8 @@ const unsigned int INITIAL_OBJECT_CAPACITY = 10;
 
 // Draw
 const float backgroundColor[4] = { 0.2f, 0.3f, 0.3f, 1.0f };
+const unsigned int MAX_PER_OBJECTS_COUNT = 100; // also update this constant in the shader_per_object.vert shader
 
+// Debugging
+const bool ExternalDebug = false;
 #endif

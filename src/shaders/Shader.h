@@ -123,6 +123,12 @@ public:
     {
         glUniform1i(glGetUniformLocation(ID, name.c_str()), value);
     }
+    void setIntArr(const std::string& name, int value[MAX_PER_OBJECTS_COUNT]) {
+        for (int i = 0; i < MAX_PER_OBJECTS_COUNT; i++)
+        {
+            this->setInt(name + "[" + std::to_string(i) + "]", value[i]);
+        }
+    }
     // ------------------------------------------------------------------------
     void setFloat(const std::string& name, float value) const
     {

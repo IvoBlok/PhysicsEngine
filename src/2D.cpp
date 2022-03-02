@@ -62,16 +62,18 @@ int main() {
 
     // objects
     // -----------
-    bufferHandler.createObject(objectTypes::CUBE, false, glm::vec3{ 0, 0, 0 }, glm::vec3{ 500, 500, 500 });
+    bufferHandler.createObject(objectTypes::CUBE, false, glm::vec3{ 1, 1, 1 }, glm::vec3{ 0, 0, 0 });
+    bufferHandler.createObject(objectTypes::CUBE, false, glm::vec3{ 1, 1, 1 }, glm::vec3{ 1, 1, 1 });
+    bufferHandler.createObject(objectTypes::CUBE, false, glm::vec3{ 1, 1, 1 }, glm::vec3{ 2, 2, 2 });
 
-    int halfGridSize = 15;
+    int halfGridSize = 1;
     for (int i = -halfGridSize; i <= halfGridSize; i++)
     {
         for (int j = -halfGridSize; j <= halfGridSize; j++)
         {
             for (int k = -halfGridSize; k <= halfGridSize; k++)
             {
-                bufferHandler.createObject(objectTypes::CUBE, true, glm::vec3{ 0, 0, 0 }, glm::vec3{2*i, 2*j, 2*k});
+                bufferHandler.createObject(objectTypes::CUBE, true, glm::vec3{ 0, 0, 0 }, glm::vec3{ 2 * i, 2 * j, 2 * k });
             }
         }
     }
