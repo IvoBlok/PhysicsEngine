@@ -127,26 +127,20 @@ public:
 
 		// draw instanced objects
 		// ---------
-		
+		// activate correct shader
+		instancingShader.use();
 		for (size_t i = 0; i < instancingObjectInfoVector.size(); i++)
 		{
-			// activate correct shader
-			instancingShader.use();
 
 			// bind relevant buffer objects
 			glBindVertexArray(instancingVAOs[i]);
 			glBindBuffer(GL_ARRAY_BUFFER, instancingVBOs[i]);
 			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, instancingEBOs[i]);
 			glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancingSSBOs[i]);
-			//glBindBuffer(GL_UNIFORM_BUFFER, instancingUBOs[i]);
-
-			glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection));
-			glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
 
 			// draw
 			glDrawElementsInstanced(GL_TRIANGLES, (GLsizei)instancingIndicesVector[i].size, GL_UNSIGNED_INT, 0, (GLsizei)instancingObjectInfoVector[i].size );
 		}
-		
 		frame++;
 	};
 	
@@ -312,11 +306,6 @@ public:
 		}
 		return engineObject;
 	}
-
-	// object functions
-	// ---------
-	void moveObject(EngineObject&);
-	void removeObject(EngineObject&);
 
 private:
 	// private variables
