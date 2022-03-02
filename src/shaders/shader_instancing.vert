@@ -16,7 +16,7 @@ out int objectInfoIndexList; //1 value, but it goes to the geometry shader, so i
 
 // buffers
 // -----------
-layout (std140, binding=0) buffer allObjectInfo
+layout (std140, binding=1) buffer allObjectInfo
 { 
   ObjectInfo_t objectInfo[];
 };

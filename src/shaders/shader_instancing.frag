@@ -21,7 +21,7 @@ in vec3 gNormal;
 
 // buffers
 // -----------
-layout (std140, binding=0) buffer allObjectInfo
+layout (std140, binding=1) buffer allObjectInfo
 { 
   ObjectInfo_t objectInfo[];
 };

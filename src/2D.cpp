@@ -35,16 +35,16 @@ int main() {
     
     Shader& instancingShader = bufferHandler.createShader(
         true,
-        "../src/shaders/shader_instancing.vert",
-        "../src/shaders/shader_instancing.frag",
-        "../src/shaders/shader_instancing.geom"
+        "src/shaders/shader_instancing.vert",
+        "src/shaders/shader_instancing.frag",
+        "src/shaders/shader_instancing.geom"
     );
 
     Shader& perObjectShader = bufferHandler.createShader(
         false,
-        "../src/shaders/shader_per_object.vert",
-        "../src/shaders/shader_per_object.frag",
-        "../src/shaders/shader_per_object.geom"
+        "src/shaders/shader_per_object.vert",
+        "src/shaders/shader_per_object.frag",
+        "src/shaders/shader_per_object.geom"
     );
 
     // initialize openGL settings
@@ -62,12 +62,12 @@ int main() {
 
     // objects
     // -----------
-    bufferHandler.createObject(objectTypes::CUBE);
-    bufferHandler.createObject(objectTypes::CUBE);
-    bufferHandler.createObject(objectTypes::CUBE);
-    bufferHandler.createObject(objectTypes::CUBE);
-    bufferHandler.createObject(objectTypes::CUBE);
-    bufferHandler.createObject(objectTypes::CUBE);
+    bufferHandler.createObject(objectTypes::ARROW, true);
+    bufferHandler.createObject(objectTypes::ARROW, true);
+    bufferHandler.createObject(objectTypes::CUBE, false);
+    bufferHandler.createObject(objectTypes::CUBE, false);
+    bufferHandler.createObject(objectTypes::CUBE, false);
+    bufferHandler.createObject(objectTypes::CUBE, false);
 
     // render loop
     // -----------
