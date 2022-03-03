@@ -24,15 +24,20 @@ int main() {
     // -----------
     GLFWHandler::init();
     GLFWwindow* window = GLFWHandler::getGLFWWindow(SCR_WIDTH, SCR_HEIGHT, "3D Engine :)");
+    glfwMakeContextCurrent(window);
+
+    // disable V-Sync
+    glfwSwapInterval(0);
 
     // load GLAD
     // -----------
     GLFWHandler::loadGLAD();
 
-    // Setup shaders and bufferhandler
+    // Setup bufferhandler and shaders
     // -----------
     BufferHandler bufferHandler{};
-    
+    bufferHandler.window = window;
+
     Shader& instancingShader = bufferHandler.createShader(
         true,
         "src/shaders/shader_instancing.vert",
@@ -49,7 +54,7 @@ int main() {
 
     // initialize openGL settings
     // -----------
-
+    
     glEnable(GL_DEPTH_TEST);
     glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);
     glEnable(GL_CULL_FACE);
@@ -57,7 +62,7 @@ int main() {
 
     // lighting
     // -----------
-    DirLightData directionalLight{ glm::vec3(-.2f, -1.f, -.3f), glm::vec3(.2f), glm::vec3(.4f)};
+    DirLightData directionalLight{ glm::vec3(-.6f, -1.f, -.3f), glm::vec3(.2f), glm::vec3(.8f)};
     bufferHandler.setDirLight(directionalLight);
 
     // objects
@@ -66,7 +71,7 @@ int main() {
     bufferHandler.createObject(objectTypes::CUBE, false, glm::vec3{ 1, 1, 1 }, glm::vec3{ 1, 1, 1 });
     bufferHandler.createObject(objectTypes::CUBE, false, glm::vec3{ 1, 1, 1 }, glm::vec3{ 2, 2, 2 });
 
-    int halfGridSize = 1;
+    int halfGridSize = 15;
     for (int i = -halfGridSize; i <= halfGridSize; i++)
     {
         for (int j = -halfGridSize; j <= halfGridSize; j++)
@@ -91,9 +96,6 @@ int main() {
 
         // render
         // -----------
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
         bufferHandler.draw();
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)

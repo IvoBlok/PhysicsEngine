@@ -20,6 +20,7 @@ public:
 	// ---------
 	Shader instancingShader;											//-> stores the shader class instance used for rendering instancing 'groups'
 	Shader perObjectShader;												//-> stores the shader class instance used for rendering the individual objects
+	GLFWwindow* window;
 
 	// basic functions
 	// ---------
@@ -99,7 +100,9 @@ public:
 
 		// configure universal UBO
 		// ---------
-		projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+		int width, height;
+		glfwGetWindowSize(window, &width, &height);
+		projection = glm::perspective(glm::radians(camera.Zoom), (float)width / (float)height, 0.1f, 100.0f);
 		view = camera.GetViewMatrix();
 
 		// clean old-frame buffers and set the background color
