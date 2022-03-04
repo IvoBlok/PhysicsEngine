@@ -28,7 +28,16 @@ public:
 		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
 		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+		glfwWindowHint(GLFW_SAMPLES, 4);
 	};
+
+	static void setGLSettings() {
+		glEnable(GL_DEPTH_TEST);                                // enable depth testing
+		glEnable(GL_MULTISAMPLE);                               // enable multisampling ( MSAA / anti-aliasing)
+		glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);          // set the vertex order convention for proper face culling
+		glCullFace(GL_FRONT);                                   // set the culling side
+		glEnable(GL_CULL_FACE);                                 // enable face culling
+	}
 
 	static GLFWwindow* getGLFWWindow(int width, int height, const char* title) {
 		GLFWwindow* window = glfwCreateWindow(width, height, title, NULL, NULL);

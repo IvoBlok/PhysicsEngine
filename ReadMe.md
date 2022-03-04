@@ -15,6 +15,7 @@ It currently has:
 	- V-Sync setting
 	- Working resizing
 	- Semi-fancy buffer handler and draw call manager
+	- SMAA anti-aliasing
 
 And it is fully inline, because I like to keep my declarations and definitions nice and close :)
 

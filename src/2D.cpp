@@ -26,6 +26,8 @@ int main() {
     GLFWwindow* window = GLFWHandler::getGLFWWindow(SCR_WIDTH, SCR_HEIGHT, "3D Engine :)");
     glfwMakeContextCurrent(window);
 
+    // set multisampling amount
+
     // disable V-Sync
     glfwSwapInterval(0);
 
@@ -54,11 +56,7 @@ int main() {
 
     // initialize openGL settings
     // -----------
-    
-    glEnable(GL_DEPTH_TEST);
-    glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_FRONT);
+    GLFWHandler::setGLSettings(); 
 
     // lighting
     // -----------
