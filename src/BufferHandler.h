@@ -69,7 +69,6 @@ public:
 			vertexPath = "../" + vertexPath;
 			fragmentPath = "../" + fragmentPath;
 			geometryPath = "../" + geometryPath;
-
 		}
 		if (instanceType) {
 			instancingShader = Shader{ vertexPath.c_str(), fragmentPath.c_str(), geometryPath.c_str() };
@@ -149,9 +148,12 @@ public:
 		frame++;
 	};
 	
-	EngineObject& createObject(objectTypes type_, bool instancing, glm::vec3 color = glm::vec3{ 1, 1, 1 }, glm::vec3 position = glm::vec3{randomRange(-2, 2), randomRange(-2, 2), randomRange(-2, 2) }) {
+	EngineObject& createObject(objectTypes type_, bool instancing, glm::vec3 position = glm::vec3{ 0 }, glm::vec3 scale = glm::vec3{ 1 }, glm::vec3 color = glm::vec3{ 1, 1, 1 }) {
 		
-		Mesh mesh = getPrimaryShapeMesh(type_);
+		Mesh mesh;
+		if (!instancing || std::find(instancingTypes.begin(), instancingTypes.end(), type_) == instancingTypes.end()) {
+			mesh = getPrimaryShapeMesh(type_);
+		}
 		EngineObject engineObject;
 
 		if (!instancing) {
@@ -164,7 +166,7 @@ public:
 			perObjectVertexLimits[newObjectIndex] = perObjectVertices.size / 3;
 			perObjectVertexLimits[newObjectIndex + 1] = -1; // required so a small optimization in the shader can be made
 
-			for (int i = 0; i < mesh.indices.size(); i++)
+			for (size_t i = 0; i < mesh.indices.size(); i++)
 			{
 				mesh.indices[i] += perObjectVertices.size / 3;
 			}
@@ -176,6 +178,8 @@ public:
 			// set objectinfo struct
 			ObjectInfo_t newObjectInfo;
 			newObjectInfo.color = glm::vec4{ color, 0 };
+			newObjectInfo.geometryMatrix = glm::scale(newObjectInfo.geometryMatrix, scale);
+			//TODO: ROTATE
 			newObjectInfo.geometryMatrix = glm::translate(glm::mat4{ 1 }, position);
 
 			perObjectObjectInfoArray.addData(newObjectInfo);
@@ -228,6 +232,8 @@ public:
 			ObjectInfo_t newObjectInfo;
 			// set objectinfo struct
 			newObjectInfo.color = glm::vec4{ color, 0 };
+			newObjectInfo.geometryMatrix = glm::scale(newObjectInfo.geometryMatrix, scale);
+			//TODO: ROTATE
 			newObjectInfo.geometryMatrix = glm::translate(glm::mat4{ 1 }, position);
 
 			int instancingGroup;
@@ -358,23 +364,23 @@ private:
 			};
 
 			std::vector<unsigned int> indices = {
-				3, 1, 0, // back side
-				3, 2, 1,
+				0, 1, 3, // back side
+				1, 2, 3,
 
-				4, 5, 7, // front side
-				5, 6, 7,
+				7, 5, 4, // front side
+				7, 6, 5,
 
-				4, 3, 0, // y+ side
-				4, 7, 3,
+				0, 3, 4, // y+ side
+				3, 7, 4,
 
-				1, 2, 5, // y- side
-				2, 6, 5,
+				5, 2, 1, // y- side
+				5, 6, 2,
 
-				0, 1, 4,// x+ side
-				1, 5, 4,
+				4, 1, 0,// x+ side
+				4, 5, 1,
 
-				7, 2, 3,// x- side
-				7, 6, 2,
+				3, 2, 7,// x- side
+				2, 6, 7,
 			};
 			Mesh mesh{ vertices, indices };
 
@@ -415,6 +421,13 @@ private:
 			};
 			Mesh mesh{ vertices, indices };
 
+			return mesh;
+		}
+		if (type == objectTypes::MODEL) {
+			std::string path = "src/external/models/SolarCarTestModel.stl";
+			if (ExternalDebug) { path = "../" + path; }
+
+			Mesh mesh{ path };
 			return mesh;
 		}
 	}

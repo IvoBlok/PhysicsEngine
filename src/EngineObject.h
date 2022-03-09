@@ -7,7 +7,8 @@
 // --------
 enum objectTypes {
 	CUBE,
-	ARROW
+	ARROW,
+	MODEL
 };
 
 struct ObjectInfo_t {
@@ -27,8 +28,10 @@ public:
 	void addData(std::vector<unsigned int> newData) {
 		if (size + newData.size() > capacity) {
 			unsigned int* placeholder = data;
+			while (size + newData.size() > capacity) {
+				capacity *= 2;
+			}
 
-			capacity *= 2;
 			data = new unsigned int[capacity];
 			for (int i = 0; i < size; i++)
 			{
@@ -56,8 +59,10 @@ public:
 	void addData(std::vector<float> newData) {
 		if (size + newData.size() > capacity) {
 			float* placeholder = data;
+			while (size + newData.size() * 3 > capacity) {
+				capacity *= 2;
+			}
 
-			capacity *= 2;
 			data = new float[capacity];
 			for (int i = 0; i < size; i++)
 			{
@@ -75,8 +80,10 @@ public:
 	void addData(std::vector<glm::vec3> newData) {
 		if (size + newData.size() * 3 > capacity) {
 			float* placeholder = data;
+			while (size + newData.size() * 3 > capacity) {
+				capacity *= 2;
+			}
 
-			capacity *= 2;
 			data = new float[capacity];
 			for (int i = 0; i < size; i++)
 			{
@@ -105,8 +112,10 @@ public:
 	void addData(std::vector<glm::vec3> newData) {
 		if (size + newData.size() > capacity) {
 			glm::vec3* placeholder = data;
+			while (size + newData.size() * 3 > capacity) {
+				capacity *= 2;
+			}
 
-			capacity *= 2;
 			data = new glm::vec3[capacity];
 			for (int i = 0; i < size; i++)
 			{

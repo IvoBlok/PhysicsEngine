@@ -35,7 +35,7 @@ public:
 		glEnable(GL_DEPTH_TEST);                                // enable depth testing
 		glEnable(GL_MULTISAMPLE);                               // enable multisampling ( MSAA / anti-aliasing)
 		glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);          // set the vertex order convention for proper face culling
-		glCullFace(GL_FRONT);                                   // set the culling side
+		glCullFace(GL_BACK);                                   // set the culling side
 		glEnable(GL_CULL_FACE);                                 // enable face culling
 	}
 

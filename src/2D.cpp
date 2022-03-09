@@ -60,26 +60,12 @@ int main() {
 
     // lighting
     // -----------
-    DirLightData directionalLight{ glm::vec3(-.6f, -1.f, -.3f), glm::vec3(.2f), glm::vec3(.8f)};
+    DirLightData directionalLight{ glm::vec3(0.6f, 0.6f, 0.6f), glm::vec3(.2f), glm::vec3(.8f)};
     bufferHandler.setDirLight(directionalLight);
 
     // objects
     // -----------
-    bufferHandler.createObject(objectTypes::CUBE, false, glm::vec3{ 1, 1, 1 }, glm::vec3{ 0, 0, 0 });
-    bufferHandler.createObject(objectTypes::CUBE, false, glm::vec3{ 1, 1, 1 }, glm::vec3{ 1, 1, 1 });
-    bufferHandler.createObject(objectTypes::CUBE, false, glm::vec3{ 1, 1, 1 }, glm::vec3{ 2, 2, 2 });
-
-    int halfGridSize = 15;
-    for (int i = -halfGridSize; i <= halfGridSize; i++)
-    {
-        for (int j = -halfGridSize; j <= halfGridSize; j++)
-        {
-            for (int k = -halfGridSize; k <= halfGridSize; k++)
-            {
-                bufferHandler.createObject(objectTypes::CUBE, true, glm::vec3{ 0, 0, 0 }, glm::vec3{ 2 * i, 2 * j, 2 * k });
-            }
-        }
-    }
+    bufferHandler.createObject(objectTypes::CUBE, false);
 
     // render loop
     // -----------
