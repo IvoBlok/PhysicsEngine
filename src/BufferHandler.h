@@ -105,14 +105,9 @@ public:
 		newObjectInfo.geometryMatrix = glm::rotate(newObjectInfo.geometryMatrix, object->rotation.z, glm::vec3{ 0, 0, 1 });
 
 		// translation
-		newObjectInfo.geometryMatrix[3][0] = object->scale.x;
-		newObjectInfo.geometryMatrix[3][1] = object->scale.y;
-		newObjectInfo.geometryMatrix[3][2] = object->scale.z;
-
-
-		//newObjectInfo.geometryMatrix = glm::scale(glm::mat4(), object->scale);
-		//newObjectInfo.geometryMatrix = glm::yawPitchRoll(object->rotation.x, object->rotation.y, object->rotation.z) * newObjectInfo.geometryMatrix;
-		//newObjectInfo.geometryMatrix = glm::translate(newObjectInfo.geometryMatrix, object->position);
+		newObjectInfo.geometryMatrix[3][0] = object->position.x;
+		newObjectInfo.geometryMatrix[3][1] = object->position.y;
+		newObjectInfo.geometryMatrix[3][2] = object->position.z;
 
 		if (object->instancedObject) {
 			instancingObjectInfoVector[object->verticesIndex].data[object->objectInfoIndex] = newObjectInfo;
