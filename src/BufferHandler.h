@@ -3,6 +3,7 @@
 
 //external
 #include <GLM/gtx/string_cast.hpp>
+#include <GLM/gtx/euler_angles.hpp>
 
 //internal
 #include "settings.h"
@@ -36,7 +37,7 @@ public:
 		// destroy objects
 		for (size_t i = 0; i < engineObjects.size(); i++)
 		{
-			engineObjects[i].~EngineObject();
+			engineObjects[i]->~EngineObject();
 		}
 
 		// delete GPU buffers
@@ -88,21 +89,48 @@ public:
 		instancingShader.setDirLight(directionalLight);
 	}
 
+	void updateEngineObjectMatrix(std::shared_ptr<EngineObject> object) {
+		ObjectInfo_t newObjectInfo;
+		newObjectInfo.color = glm::vec4{ object->color, 0 };
+		newObjectInfo.geometryMatrix = glm::mat4{ 1 };
+		
+		// scale
+		newObjectInfo.geometryMatrix[0][0] = object->scale.x;
+		newObjectInfo.geometryMatrix[1][1] = object->scale.y;
+		newObjectInfo.geometryMatrix[2][2] = object->scale.z;
+
+		// rotation
+		newObjectInfo.geometryMatrix = glm::rotate(newObjectInfo.geometryMatrix, object->rotation.x, glm::vec3{ 1, 0, 0 });
+		newObjectInfo.geometryMatrix = glm::rotate(newObjectInfo.geometryMatrix, object->rotation.y, glm::vec3{ 0, 1, 0 });
+		newObjectInfo.geometryMatrix = glm::rotate(newObjectInfo.geometryMatrix, object->rotation.z, glm::vec3{ 0, 0, 1 });
+
+		// translation
+		newObjectInfo.geometryMatrix[3][0] = object->scale.x;
+		newObjectInfo.geometryMatrix[3][1] = object->scale.y;
+		newObjectInfo.geometryMatrix[3][2] = object->scale.z;
+
+
+		//newObjectInfo.geometryMatrix = glm::scale(glm::mat4(), object->scale);
+		//newObjectInfo.geometryMatrix = glm::yawPitchRoll(object->rotation.x, object->rotation.y, object->rotation.z) * newObjectInfo.geometryMatrix;
+		//newObjectInfo.geometryMatrix = glm::translate(newObjectInfo.geometryMatrix, object->position);
+
+		if (object->instancedObject) {
+			instancingObjectInfoVector[object->verticesIndex].data[object->objectInfoIndex] = newObjectInfo;
+		}
+		else {
+			perObjectObjectInfoArray.data[object->objectInfoIndex] = newObjectInfo;
+		}
+	}
+
 	// complex functions
 	// ---------
-	void draw() {
+	void draw(bool wireframe = false) {
+		if (wireframe) { glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); }
 		// check to make sure at least the UBO has been updated. it's an ugly solution, but for my goal it should work fine
 		if (perObjectObjectInfoArray.size == 0 && instancingObjectInfoVector.size() > 0) {
 			std::cout << "ERROR: CAN'T DRAW WHEN ONLY INSTANCINGOBJECTS EXIST" << std::endl;
 			return;
 		}
-
-		// configure universal UBO
-		// ---------
-		int width, height;
-		glfwGetWindowSize(window, &width, &height);
-		projection = glm::perspective(glm::radians(camera.Zoom), (float)width / (float)height, 0.1f, 100.0f);
-		view = camera.GetViewMatrix();
 
 		// clean old-frame buffers and set the background color
 		// ---------
@@ -111,50 +139,33 @@ public:
 
 		// draw single objects
 		// ---------
-		// activate correct shader
-		perObjectShader.use();
-
-		// bind relevant buffer objects
-		glBindVertexArray(perObjectVAO);
-		glBindBuffer(GL_ARRAY_BUFFER, perObjectVBO);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, perObjectEBO);
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, perObjectSSBO);
-		glBindBuffer(GL_UNIFORM_BUFFER, perObjectUBO);
-
-		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection));
-		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
-
-		perObjectShader.setIntArr("vertexLimits", perObjectVertexLimits);
-
-		// draw
+		updatePerObjectBuffers();
 		glDrawElements(GL_TRIANGLES, (GLsizei)perObjectIndices.size, GL_UNSIGNED_INT, 0);
 
 		// draw instanced objects
 		// ---------
-		// activate correct shader
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		instancingShader.use();
+
 		for (size_t i = 0; i < instancingObjectInfoVector.size(); i++)
 		{
-
-			// bind relevant buffer objects
-			glBindVertexArray(instancingVAOs[i]);
-			glBindBuffer(GL_ARRAY_BUFFER, instancingVBOs[i]);
-			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, instancingEBOs[i]);
-			glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancingSSBOs[i]);
-
-			// draw
+			updateInstancingBuffers(i);
 			glDrawElementsInstanced(GL_TRIANGLES, (GLsizei)instancingIndicesVector[i].size, GL_UNSIGNED_INT, 0, (GLsizei)instancingObjectInfoVector[i].size );
 		}
+
 		frame++;
 	};
-	
-	EngineObject& createObject(objectTypes type_, bool instancing, glm::vec3 position = glm::vec3{ 0 }, glm::vec3 scale = glm::vec3{ 1 }, glm::vec3 color = glm::vec3{ 1, 1, 1 }) {
+
+	std::shared_ptr<EngineObject> createObject(objectTypes type_, bool instancing, glm::vec3 position = glm::vec3{ 0 }, glm::vec3 scale = glm::vec3{ 1 }, glm::vec3 color = glm::vec3{ 1, 1, 1 }) {
 		
 		Mesh mesh;
 		if (!instancing || std::find(instancingTypes.begin(), instancingTypes.end(), type_) == instancingTypes.end()) {
 			mesh = getPrimaryShapeMesh(type_);
 		}
 		EngineObject engineObject;
+		engineObject.color = color;
+		engineObject.position = position;
+		engineObject.scale = scale;
 
 		if (!instancing) {
 			perObjectShader.use();
@@ -178,9 +189,8 @@ public:
 			// set objectinfo struct
 			ObjectInfo_t newObjectInfo;
 			newObjectInfo.color = glm::vec4{ color, 0 };
-			newObjectInfo.geometryMatrix = glm::scale(newObjectInfo.geometryMatrix, scale);
-			//TODO: ROTATE
-			newObjectInfo.geometryMatrix = glm::translate(glm::mat4{ 1 }, position);
+			newObjectInfo.geometryMatrix = glm::scale(glm::mat4{ 1 }, scale);
+			newObjectInfo.geometryMatrix = glm::translate(newObjectInfo.geometryMatrix, position);
 
 			perObjectObjectInfoArray.addData(newObjectInfo);
 
@@ -219,22 +229,20 @@ public:
 			engineObject.verticesIndex = newObjectIndex;
 			engineObject.indicesIndex = newObjectIndex;
 			engineObject.objectInfoIndex = newObjectIndex;
+			engineObject.engineObjectListIndex = engineObjects.size();
 
-			engineObjects.push_back(engineObject);
+			engineObjects.push_back(std::make_shared<EngineObject>(engineObject));
 		}
 		else {
 			
 			instancingShader.use();
 
-			color = glm::vec3{ 1, 0.5, 0 };
-
 			// objectinfo data
 			ObjectInfo_t newObjectInfo;
 			// set objectinfo struct
 			newObjectInfo.color = glm::vec4{ color, 0 };
-			newObjectInfo.geometryMatrix = glm::scale(newObjectInfo.geometryMatrix, scale);
-			//TODO: ROTATE
-			newObjectInfo.geometryMatrix = glm::translate(glm::mat4{ 1 }, position);
+			newObjectInfo.geometryMatrix = glm::scale(glm::mat4{ 1 }, scale);
+			newObjectInfo.geometryMatrix = glm::translate(newObjectInfo.geometryMatrix, position);
 
 			int instancingGroup;
 			// check if there is a group with the current type
@@ -304,11 +312,11 @@ public:
 			engineObject.verticesIndex = instancingGroup;
 			engineObject.indicesIndex = instancingGroup;
 			engineObject.objectInfoIndex = instancingObjectInfoVector[instancingGroup].size - 1;
+			engineObject.engineObjectListIndex = engineObjects.size();
 
-			engineObjects.push_back(engineObject);
-			
+			engineObjects.push_back(std::make_shared<EngineObject>(engineObject));
 		}
-		return engineObject;
+		return engineObjects[engineObject.engineObjectListIndex];
 	}
 
 private:
@@ -317,7 +325,7 @@ private:
 	int frame = 0;														//-> stores the unique index of the frame being worked on
 	glm::mat4 view;														//-> stores (temporarily) the view matrix
 	glm::mat4 projection;												//-> stores (temporarily) the projection matrix
-	std::vector<EngineObject> engineObjects;							//-> stores all existing loaded engine objects in the scene
+	std::vector<std::shared_ptr<EngineObject>> engineObjects;			//-> stores all existing loaded engine objects in the scene
 
 	// instancing variables
 	// ---------
@@ -434,7 +442,57 @@ private:
 
 	// complex functions
 	// ---------
+	void updatePerObjectBuffers() {
+		perObjectShader.use();
 
+		glBindVertexArray(perObjectVAO);
+		glBindBuffer(GL_ARRAY_BUFFER, perObjectVBO);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, perObjectEBO);
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, perObjectSSBO);
+		glBindBuffer(GL_UNIFORM_BUFFER, perObjectUBO);
+
+		glBufferData(GL_ARRAY_BUFFER, sizeof(float) * perObjectVertices.size, perObjectVertices.data, GL_STATIC_DRAW);
+
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * perObjectIndices.size, perObjectIndices.data, GL_STATIC_DRAW);
+
+		glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(ObjectInfo_t) * perObjectObjectInfoArray.size, perObjectObjectInfoArray.data, GL_DYNAMIC_COPY);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, perObjectSSBO);
+
+		// configure universal UBO
+		// ---------
+		int width, height;
+		glfwGetWindowSize(window, &width, &height);
+		projection = glm::perspective(glm::radians(camera.Zoom), (float)width / (float)height, 0.1f, 100.0f);
+		view = camera.GetViewMatrix();
+
+		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection));
+		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
+
+		perObjectShader.setIntArr("vertexLimits", perObjectVertexLimits);
+
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(0);
+	}
+
+	void updateInstancingBuffers(int instancingGroupIndex) {
+		instancingShader.use();
+
+		glBindVertexArray(instancingVAOs[instancingGroupIndex]);
+		glBindBuffer(GL_ARRAY_BUFFER, instancingVBOs[instancingGroupIndex]);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, instancingEBOs[instancingGroupIndex]);
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancingSSBOs[instancingGroupIndex]);
+
+
+		glBufferData(GL_ARRAY_BUFFER, sizeof(float) * instancingVerticesVector[instancingGroupIndex].size, instancingVerticesVector[instancingGroupIndex].data, GL_STATIC_DRAW);
+
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * instancingIndicesVector[instancingGroupIndex].size, instancingIndicesVector[instancingGroupIndex].data, GL_STATIC_DRAW);
+
+		glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(ObjectInfo_t) * instancingObjectInfoVector[instancingGroupIndex].size, instancingObjectInfoVector[instancingGroupIndex].data, GL_DYNAMIC_COPY);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, instancingSSBOs[instancingGroupIndex]);
+
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(0);
+	}
 };
 
 #endif

@@ -65,7 +65,9 @@ int main() {
 
     // objects
     // -----------
-    bufferHandler.createObject(objectTypes::CUBE, false);
+    std::shared_ptr<EngineObject> vehicle = bufferHandler.createObject(objectTypes::MODEL, false, glm::vec3{ 0 }, glm::vec3{ 0.001 });
+    std::shared_ptr<EngineObject> cube = bufferHandler.createObject(objectTypes::CUBE, true, glm::vec3{ 1 });
+    std::shared_ptr<EngineObject> cube1 = bufferHandler.createObject(objectTypes::CUBE, true, glm::vec3{ 0 });
 
     // render loop
     // -----------
@@ -73,14 +75,25 @@ int main() {
     while (!glfwWindowShouldClose(window))
     {
         updateTime();
-
+        
+        vehicle->rotate(glm::vec3{0.01, 0, 0}); bufferHandler.updateEngineObjectMatrix(vehicle);
+        cube->rotate(glm::vec3{ -0.01, 0, 0 }); bufferHandler.updateEngineObjectMatrix(cube);
+        
         // input
         // -----------
         std::vector<float> inputs = processInput(window);
+        if (inputs.size() != 0) {
+            if (inputs.size() == 3 && !buttonPressed) {
+                vehicle->setRotation(glm::vec3{ inputs[0], inputs[1], inputs[2] });
+                bufferHandler.updateEngineObjectMatrix(vehicle);
+            }
+            buttonPressed = true;
+        }
+        else { buttonPressed = false; }
 
         // render
         // -----------
-        bufferHandler.draw();
+        bufferHandler.draw(true);
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -----------
@@ -123,7 +136,7 @@ std::vector<float> processInput(GLFWwindow* window)
         camera.ProcessKeyboard(Camera_Movement::DOWN, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS) {
         std::vector<float> values = {0, 0, 0};
-        std::cout << "lightDir: " << std::endl;
+        std::cout << "translate: " << std::endl;
         std::cin >> values[0];
         std::cin >> values[1];
         std::cin >> values[2];

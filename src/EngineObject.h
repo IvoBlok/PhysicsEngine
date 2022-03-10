@@ -3,6 +3,8 @@
 
 #include "settings.h"
 
+#include <GLM/gtc/quaternion.hpp>
+
 // data structs / enums
 // --------
 enum objectTypes {
@@ -165,14 +167,53 @@ public:
 
 class EngineObject {
 public:
+	glm::vec3 position = glm::vec3{ 0.f };
+	glm::vec3 scale = glm::vec3{ 1.f };
+	glm::vec3 rotation = glm::vec3{ 0.f };
+	glm::vec3 color;
+	
+	EngineObject() {}
+	~EngineObject() {}
 
-	bool instancedObject = false;
+	void moveTo(glm::vec3 position_) {
+		position = position_;
+	}
+
+	void moveBy(glm::vec3 translation_) {
+		position += translation_;
+	}
+
+	void scaleBy(glm::vec3 scale_) {
+		scale += scale_;
+	}
+
+	void scaleBy(float scale_) {
+		scale += scale_;
+	}
+
+	void setScale(glm::vec3 scale_) {
+		scale = scale_;
+	}
+
+	void setScale(float scale_) {
+		scale = glm::vec3{ scale_ };
+	}
+	
+	void setRotation(glm::vec3 rotation_) {
+		rotation = glm::radians(rotation_);
+	}
+
+	void rotate(glm::vec3 angles_) {
+		rotation += glm::radians(angles_);
+	}
+
+	bool instancedObject;
 	unsigned int objectInfoIndex = -1;
 	unsigned int verticesIndex = -1;
 	unsigned int indicesIndex = -1;
+	unsigned int engineObjectListIndex = -1;
 
-	EngineObject() {}
-	~EngineObject() {}
+private:
 };
 
 #endif
