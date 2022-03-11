@@ -241,10 +241,6 @@ public:
 	
 	void setRotationAxis(glm::vec3 axis_) { rotationAxis = glm::normalize(axis_); }
 
-	// miscellaneous
-	// -------
-
-
 	// variables
 	// -------
 	bool instancedObject;
@@ -252,8 +248,6 @@ public:
 	unsigned int verticesIndex = -1;
 	unsigned int indicesIndex = -1;
 	unsigned int engineObjectListIndex = -1;
-
-private:
 };
 
 #endif

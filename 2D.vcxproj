@@ -173,13 +173,11 @@
   <ItemGroup>
     <ClCompile Include="src\external\glad.c" />
     <ClCompile Include="src\2D.cpp" />
-    <ClCompile Include="src\external\stb_image.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\BufferHandler.h" />
     <ClInclude Include="src\Camera.h" />
     <ClInclude Include="src\EngineObject.h" />
-    <ClInclude Include="src\external\stb_image.h" />
     <ClInclude Include="src\GLFWHandler.h" />
     <ClInclude Include="src\MathFunctions.h" />
     <ClInclude Include="src\Mesh.h" />

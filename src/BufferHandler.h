@@ -250,6 +250,12 @@ public:
 		return engineObjects[engineObject.engineObjectListIndex];
 	}
 
+	// public object data manipulation functions
+	// ---------
+	void moveObjectOriginToAvg(std::shared_ptr<EngineObject> object) {
+		//TODO! IMPLEMENTATION: MOVE ORIGIN TO AVERAGE OF ALL VERTICES
+	}
+
 private:
 	// private variables
 	// ---------
