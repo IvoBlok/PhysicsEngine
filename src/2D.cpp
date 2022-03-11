@@ -66,26 +66,32 @@ int main() {
     // objects
     // -----------
     std::shared_ptr<EngineObject> vehicle = bufferHandler.createObject(objectTypes::MODEL, false, glm::vec3{ 0 }, glm::vec3{ 0.001 });
+    std::shared_ptr<EngineObject> vehicle2 = bufferHandler.createObject(objectTypes::MODEL, false, glm::vec3{ -2 }, glm::vec3{ 0.001 });
     std::shared_ptr<EngineObject> cube = bufferHandler.createObject(objectTypes::CUBE, true, glm::vec3{ 1 });
-    std::shared_ptr<EngineObject> cube1 = bufferHandler.createObject(objectTypes::CUBE, true, glm::vec3{ 0 });
+
+    std::shared_ptr<EngineObject> vecX = bufferHandler.createObject(objectTypes::VECTOR, true, glm::vec3{ 0 }, glm::vec3{ 1, 2, 1 }, glm::vec3{ 1, 0, 0 }, glm::vec3{ 1, 0, 0 });
+    std::shared_ptr<EngineObject> vecY = bufferHandler.createObject(objectTypes::VECTOR, true, glm::vec3{ 0 }, glm::vec3{ 1, 2, 1 }, glm::vec3{ 0, 1, 0 }, glm::vec3{ 0, 1, 0 });
+    std::shared_ptr<EngineObject> vecZ = bufferHandler.createObject(objectTypes::VECTOR, true, glm::vec3{ 0 }, glm::vec3{ 1, 2, 1 }, glm::vec3{ 0, 0, 1 }, glm::vec3{ 0, 0, 1 });
+
+    cube->setRotationAxis(glm::vec3{ 1, 1, 1 });
 
     // render loop
     // -----------
-
     while (!glfwWindowShouldClose(window))
     {
         updateTime();
         
-        vehicle->rotate(glm::vec3{0.01, 0, 0}); bufferHandler.updateEngineObjectMatrix(vehicle);
-        cube->rotate(glm::vec3{ -0.01, 0, 0 }); bufferHandler.updateEngineObjectMatrix(cube);
-        
+        cube->rotateAroundAxis(0.001); bufferHandler.updateEngineObjectMatrix(cube);
+
+
         // input
         // -----------
         std::vector<float> inputs = processInput(window);
         if (inputs.size() != 0) {
             if (inputs.size() == 3 && !buttonPressed) {
-                vehicle->setRotation(glm::vec3{ inputs[0], inputs[1], inputs[2] });
-                bufferHandler.updateEngineObjectMatrix(vehicle);
+
+
+
             }
             buttonPressed = true;
         }

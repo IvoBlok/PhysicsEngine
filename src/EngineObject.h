@@ -9,7 +9,7 @@
 // --------
 enum objectTypes {
 	CUBE,
-	ARROW,
+	VECTOR,
 	MODEL
 };
 
@@ -169,12 +169,16 @@ class EngineObject {
 public:
 	glm::vec3 position = glm::vec3{ 0.f };
 	glm::vec3 scale = glm::vec3{ 1.f };
-	glm::vec3 rotation = glm::vec3{ 0.f };
 	glm::vec3 color;
+
+	glm::vec3 rotationAxis = glm::vec3{ 0, 1, 0 };
+	float angle = 0;
 	
 	EngineObject() {}
 	~EngineObject() {}
 
+	// translate
+	// -------
 	void moveTo(glm::vec3 position_) {
 		position = position_;
 	}
@@ -183,6 +187,8 @@ public:
 		position += translation_;
 	}
 
+	// scale
+	// -------
 	void scaleBy(glm::vec3 scale_) {
 		scale += scale_;
 	}
@@ -199,14 +205,48 @@ public:
 		scale = glm::vec3{ scale_ };
 	}
 	
-	void setRotation(glm::vec3 rotation_) {
-		rotation = glm::radians(rotation_);
+	// rotation 
+	// -------
+	void setDirection(glm::vec3 direction_) {
+		rotationAxis = glm::normalize(glm::cross(direction_, glm::vec3{ 0, 1, 0 }));
+
+		if (direction_.x == 0 && direction_.y != 0 && direction_.z == 0) {
+			if (direction_.y < 0) {
+				rotationAxis = glm::vec3{ 0, 0, 1 };
+				angle = glm::radians(180.f);
+			}
+			else {
+				rotationAxis = glm::vec3{ 0, 1, 0 };
+				angle = 0;
+			}
+			return;
+		}
+
+		angle = glm::acos(glm::dot(glm::normalize(direction_), glm::vec3{ 0, 1, 0 }));
+		glm::vec3 refVec = glm::normalize(glm::cross(rotationAxis, glm::vec3{ 0, 1, 0 }));
+		
+		if (glm::dot(refVec, direction_) < 0) {
+			angle = -angle;
+		}
 	}
 
-	void rotate(glm::vec3 angles_) {
-		rotation += glm::radians(angles_);
+	void pointTo(glm::vec3 point_) {
+		glm::vec3 direction_ = point_ - position;
+		setDirection(direction_);
 	}
 
+	void rotateAroundAxis(float angle_) { angle += angle_; }
+
+	void setRotationAroundAxis(float angle_) { angle = angle_; }
+	
+	void setRotationAxis(glm::vec3 axis_) { rotationAxis = glm::normalize(axis_); }
+
+	// miscellaneous
+	// -------
+
+
+	// variables
+	// -------
 	bool instancedObject;
 	unsigned int objectInfoIndex = -1;
 	unsigned int verticesIndex = -1;

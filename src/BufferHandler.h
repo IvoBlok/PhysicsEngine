@@ -1,16 +1,16 @@
 #ifndef BUFFERHANDLER_H
 #define BUFFERHANDLER_H
 
-//external
+// external
 #include <GLM/gtx/string_cast.hpp>
 #include <GLM/gtx/euler_angles.hpp>
 
-//internal
+// internal
 #include "settings.h"
 #include "EngineObject.h"
 #include "Mesh.h"
 
-//std
+// std
 #include <algorithm>
 
 // main class
@@ -93,16 +93,9 @@ public:
 		ObjectInfo_t newObjectInfo;
 		newObjectInfo.color = glm::vec4{ object->color, 0 };
 		newObjectInfo.geometryMatrix = glm::mat4{ 1 };
-		
-		// scale
-		newObjectInfo.geometryMatrix[0][0] = object->scale.x;
-		newObjectInfo.geometryMatrix[1][1] = object->scale.y;
-		newObjectInfo.geometryMatrix[2][2] = object->scale.z;
-
-		// rotation
-		newObjectInfo.geometryMatrix = glm::rotate(newObjectInfo.geometryMatrix, object->rotation.x, glm::vec3{ 1, 0, 0 });
-		newObjectInfo.geometryMatrix = glm::rotate(newObjectInfo.geometryMatrix, object->rotation.y, glm::vec3{ 0, 1, 0 });
-		newObjectInfo.geometryMatrix = glm::rotate(newObjectInfo.geometryMatrix, object->rotation.z, glm::vec3{ 0, 0, 1 });
+	
+		newObjectInfo.geometryMatrix = glm::rotate(newObjectInfo.geometryMatrix, object->angle, object->rotationAxis);
+		newObjectInfo.geometryMatrix = glm::scale(newObjectInfo.geometryMatrix, object->scale);
 
 		// translation
 		newObjectInfo.geometryMatrix[3][0] = object->position.x;
@@ -121,11 +114,6 @@ public:
 	// ---------
 	void draw(bool wireframe = false) {
 		if (wireframe) { glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); }
-		// check to make sure at least the UBO has been updated. it's an ugly solution, but for my goal it should work fine
-		if (perObjectObjectInfoArray.size == 0 && instancingObjectInfoVector.size() > 0) {
-			std::cout << "ERROR: CAN'T DRAW WHEN ONLY INSTANCINGOBJECTS EXIST" << std::endl;
-			return;
-		}
 
 		// clean old-frame buffers and set the background color
 		// ---------
@@ -151,16 +139,31 @@ public:
 		frame++;
 	};
 
-	std::shared_ptr<EngineObject> createObject(objectTypes type_, bool instancing, glm::vec3 position = glm::vec3{ 0 }, glm::vec3 scale = glm::vec3{ 1 }, glm::vec3 color = glm::vec3{ 1, 1, 1 }) {
+	std::shared_ptr<EngineObject> createObject(objectTypes type_, bool instancing, glm::vec3 position = glm::vec3{ 0 }, glm::vec3 scale = glm::vec3{ 1 }, glm::vec3 color = glm::vec3{ 1, 1, 1 }, glm::vec3 direction = glm::vec3{ 0, 1, 0 }) {
 		
 		Mesh mesh;
 		if (!instancing || std::find(instancingTypes.begin(), instancingTypes.end(), type_) == instancingTypes.end()) {
 			mesh = getPrimaryShapeMesh(type_);
 		}
+
 		EngineObject engineObject;
 		engineObject.color = color;
 		engineObject.position = position;
 		engineObject.scale = scale;
+		engineObject.setDirection(direction);
+
+		// set objectinfo struct
+		ObjectInfo_t newObjectInfo;
+		newObjectInfo.color = glm::vec4{ color, 0 };
+		newObjectInfo.geometryMatrix = glm::mat4{ 1 };
+
+		newObjectInfo.geometryMatrix = glm::rotate(newObjectInfo.geometryMatrix, engineObject.angle, engineObject.rotationAxis);
+		newObjectInfo.geometryMatrix = glm::scale(newObjectInfo.geometryMatrix, scale);
+
+		// translation
+		newObjectInfo.geometryMatrix[3][0] = position.x;
+		newObjectInfo.geometryMatrix[3][1] = position.y;
+		newObjectInfo.geometryMatrix[3][2] = position.z;
 
 		if (!instancing) {
 			perObjectShader.use();
@@ -181,42 +184,7 @@ public:
 			perObjectVertices.addData(mesh.vertices);
 			perObjectIndices.addData(mesh.indices);
 
-			// set objectinfo struct
-			ObjectInfo_t newObjectInfo;
-			newObjectInfo.color = glm::vec4{ color, 0 };
-			newObjectInfo.geometryMatrix = glm::scale(glm::mat4{ 1 }, scale);
-			newObjectInfo.geometryMatrix = glm::translate(newObjectInfo.geometryMatrix, position);
-
 			perObjectObjectInfoArray.addData(newObjectInfo);
-
-			//create bufferobjects
-			// ---------
-
-			glBindVertexArray(perObjectVAO);
-
-			glBindBuffer(GL_ARRAY_BUFFER, perObjectVBO);
-			glBufferData(GL_ARRAY_BUFFER, sizeof(float) * perObjectVertices.size, perObjectVertices.data, GL_STATIC_DRAW);
-
-			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, perObjectEBO);
-			glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * perObjectIndices.size, perObjectIndices.data, GL_STATIC_DRAW);
-
-			glBindBuffer(GL_SHADER_STORAGE_BUFFER, perObjectSSBO);
-			glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(ObjectInfo_t) * perObjectObjectInfoArray.size, perObjectObjectInfoArray.data, GL_DYNAMIC_COPY);
-			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, perObjectSSBO);
-
-			GLuint uniformBlockIndexMatrices = glGetUniformBlockIndex(perObjectShader.ID, "Matrices");
-			if (uniformBlockIndexMatrices < 0) { std::cout << "unfiromblockindexmatrices not found ..." << std::endl; }
-
-			// then we link each shader's uniform block to this uniform binding point
-			glUniformBlockBinding(perObjectShader.ID, uniformBlockIndexMatrices, 0);
-			glBindBuffer(GL_UNIFORM_BUFFER, perObjectUBO);
-			glBufferData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), NULL, GL_STATIC_DRAW);
-			// define the range of the buffer that links to a uniform binding point
-			glBindBufferRange(GL_UNIFORM_BUFFER, 0, perObjectUBO, 0, 2 * sizeof(glm::mat4));
-
-
-			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-			glEnableVertexAttribArray(0);
 
 			// create engineobject
 			// -----------
@@ -225,34 +193,17 @@ public:
 			engineObject.indicesIndex = newObjectIndex;
 			engineObject.objectInfoIndex = newObjectIndex;
 			engineObject.engineObjectListIndex = engineObjects.size();
-
-			engineObjects.push_back(std::make_shared<EngineObject>(engineObject));
 		}
 		else {
-			
 			instancingShader.use();
-
-			// objectinfo data
-			ObjectInfo_t newObjectInfo;
-			// set objectinfo struct
-			newObjectInfo.color = glm::vec4{ color, 0 };
-			newObjectInfo.geometryMatrix = glm::scale(glm::mat4{ 1 }, scale);
-			newObjectInfo.geometryMatrix = glm::translate(newObjectInfo.geometryMatrix, position);
-
 			int instancingGroup;
+
 			// check if there is a group with the current type
 			// ---------
-			
 			if (std::find(instancingTypes.begin(), instancingTypes.end(), type_) != instancingTypes.end()) {
 				instancingGroup = std::distance(instancingTypes.begin(), std::find(instancingTypes.begin(), instancingTypes.end(), type_));
 
-				// only thing that needs to be updated is the SSBO and objectinfovector
-				// ---------
 				instancingObjectInfoVector[instancingGroup].addData(newObjectInfo);
-
-				glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancingSSBOs[instancingGroup]);
-				glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(ObjectInfo_t) * instancingObjectInfoVector[instancingGroup].size, instancingObjectInfoVector[instancingGroup].data, GL_DYNAMIC_COPY);
-				glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, instancingSSBOs[instancingGroup]);
 			}
 			else {
 				// add the new type to the group
@@ -280,21 +231,6 @@ public:
 				glGenBuffers(1, &SSBO);
 				glBindVertexArray(VAO);
 
-
-				glBindBuffer(GL_ARRAY_BUFFER, VBO);
-				glBufferData(GL_ARRAY_BUFFER, sizeof(float)* instancingVerticesVector[instancingGroup].size, instancingVerticesVector[instancingGroup].data, GL_STATIC_DRAW);
-
-				glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-				glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int)* instancingIndicesVector[instancingGroup].size, instancingIndicesVector[instancingGroup].data, GL_STATIC_DRAW);
-
-				glBindBuffer(GL_SHADER_STORAGE_BUFFER, SSBO);
-				glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(ObjectInfo_t)* instancingObjectInfoVector[instancingGroup].size, instancingObjectInfoVector[instancingGroup].data, GL_DYNAMIC_COPY);
-				glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, SSBO);
-
-
-				glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-				glEnableVertexAttribArray(0);
-
 				instancingVAOs.push_back(VAO);
 				instancingVBOs.push_back(VBO);
 				instancingEBOs.push_back(EBO);
@@ -308,9 +244,9 @@ public:
 			engineObject.indicesIndex = instancingGroup;
 			engineObject.objectInfoIndex = instancingObjectInfoVector[instancingGroup].size - 1;
 			engineObject.engineObjectListIndex = engineObjects.size();
-
-			engineObjects.push_back(std::make_shared<EngineObject>(engineObject));
 		}
+
+		engineObjects.push_back(std::make_shared<EngineObject>(engineObject));
 		return engineObjects[engineObject.engineObjectListIndex];
 	}
 
@@ -347,6 +283,7 @@ private:
 	unsigned int perObjectVAO;
 	unsigned int perObjectSSBO;
 	unsigned int perObjectUBO;
+	bool UBOInitialized = false;
 	int perObjectVertexLimits[MAX_PER_OBJECTS_COUNT];					//-> stores the starting vertex_IDs for every objects. Is linked to a uniform for the per_object vertex shader
 
 	// basic functions
@@ -389,41 +326,11 @@ private:
 
 			return mesh;
 		}
-		if (type == objectTypes::ARROW) {
-			std::vector<float> vertices = {
-				// positions      
-				 1.5f,  0.5f, -0.2f,
-				 1.5f, -0.5f, -0.5f,
-				-1.5f, -0.5f, -0.5f,
-				-1.5f,  0.5f, -0.5f,
+		if (type == objectTypes::VECTOR) {
+			std::string path = "src/external/models/vector.stl";
+			if (ExternalDebug) { path = "../" + path; }
 
-				 1.5f,  0.5f,  0.5f,
-				 1.5f, -0.5f,  0.5f,
-				-1.5f, -0.5f,  0.5f,
-				-1.5f,  0.5f,  0.5f,
-			};
-
-			std::vector<unsigned int> indices = {
-				3, 1, 0, // back side
-				3, 2, 1,
-
-				4, 5, 7, // front side
-				5, 6, 7,
-
-				4, 3, 0, // y+ side
-				4, 7, 3,
-
-				1, 2, 5, // y- side
-				2, 6, 5,
-
-				0, 1, 4,// x+ side
-				1, 5, 4,
-
-				7, 2, 3,// x- side
-				7, 6, 2,
-			};
-			Mesh mesh{ vertices, indices };
-
+			Mesh mesh{ path };
 			return mesh;
 		}
 		if (type == objectTypes::MODEL) {
@@ -445,6 +352,20 @@ private:
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, perObjectEBO);
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, perObjectSSBO);
 		glBindBuffer(GL_UNIFORM_BUFFER, perObjectUBO);
+
+		// setup
+		if (!UBOInitialized) {
+			GLuint uniformBlockIndexMatrices = glGetUniformBlockIndex(perObjectShader.ID, "Matrices");
+			if (uniformBlockIndexMatrices < 0) { std::cout << "unfiromblockindexmatrices not found ..." << std::endl; }
+
+			// then we link each shader's uniform block to this uniform binding point
+			glUniformBlockBinding(perObjectShader.ID, uniformBlockIndexMatrices, 0);
+			glBindBuffer(GL_UNIFORM_BUFFER, perObjectUBO);
+			glBufferData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), NULL, GL_STATIC_DRAW);
+			// define the range of the buffer that links to a uniform binding point
+			glBindBufferRange(GL_UNIFORM_BUFFER, 0, perObjectUBO, 0, 2 * sizeof(glm::mat4));
+			UBOInitialized = true;
+		}
 
 		glBufferData(GL_ARRAY_BUFFER, sizeof(float) * perObjectVertices.size, perObjectVertices.data, GL_STATIC_DRAW);
 
@@ -470,6 +391,23 @@ private:
 	}
 
 	void updateInstancingBuffers(int instancingGroupIndex) {
+		// setup
+		if (!UBOInitialized) {
+			glBindVertexArray(perObjectVAO);
+			glBindBuffer(GL_UNIFORM_BUFFER, perObjectUBO);
+
+			GLuint uniformBlockIndexMatrices = glGetUniformBlockIndex(perObjectShader.ID, "Matrices");
+			if (uniformBlockIndexMatrices < 0) { std::cout << "unfiromblockindexmatrices not found ..." << std::endl; }
+
+			// then we link each shader's uniform block to this uniform binding point
+			glUniformBlockBinding(perObjectShader.ID, uniformBlockIndexMatrices, 0);
+			glBindBuffer(GL_UNIFORM_BUFFER, perObjectUBO);
+			glBufferData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), NULL, GL_STATIC_DRAW);
+			// define the range of the buffer that links to a uniform binding point
+			glBindBufferRange(GL_UNIFORM_BUFFER, 0, perObjectUBO, 0, 2 * sizeof(glm::mat4));
+			UBOInitialized = true;
+		}
+		
 		instancingShader.use();
 
 		glBindVertexArray(instancingVAOs[instancingGroupIndex]);

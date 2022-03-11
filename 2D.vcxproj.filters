@@ -64,5 +64,7 @@
     <None Include="src\shaders\shader_per_object.frag" />
     <None Include="src\shaders\shader_per_object.geom" />
     <None Include="src\shaders\shader_per_object.vert" />
+    <None Include="src\shaders\shader_text.vert" />
+    <None Include="src\shaders\shader_text.frag" />
   </ItemGroup>
 </Project>
