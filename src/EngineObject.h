@@ -13,6 +13,12 @@ enum objectTypes {
 	MODEL
 };
 
+struct Vector3D {
+	glm::vec3 direction;
+	glm::vec3 position;
+	float length;
+};
+
 struct ObjectInfo_t {
 	glm::mat4 geometryMatrix = glm::mat4(1.0);
 	glm::vec4 color = glm::vec4(0.0); // only first three values are used
@@ -165,14 +171,48 @@ public:
 	}
 };
 
+class ObjectRotation {
+public:
+	glm::vec3 axis = glm::vec3{ 0, 1, 0 };
+	float angle = 0;
+
+	void setDirection(glm::vec3 direction_) {
+		axis = glm::normalize(glm::cross(direction_, glm::vec3{ 0, 1, 0 }));
+
+		if (direction_.x == 0 && direction_.y != 0 && direction_.z == 0) {
+			if (direction_.y < 0) {
+				axis = glm::vec3{ 0, 0, 1 };
+				angle = glm::radians(180.f);
+			}
+			else {
+				axis = glm::vec3{ 0, 1, 0 };
+				angle = 0;
+			}
+			return;
+		}
+
+		angle = glm::acos(glm::dot(glm::normalize(direction_), glm::vec3{ 0, 1, 0 }));
+		glm::vec3 refVec = glm::normalize(glm::cross(axis, glm::vec3{ 0, 1, 0 }));
+
+		if (glm::dot(refVec, direction_) < 0) {
+			angle = -angle;
+		}
+	}
+
+	void rotateAroundAxis(float angle_) { angle += angle_; }
+
+	void setRotationAroundAxis(float angle_) { angle = angle_; }
+
+	void setRotationAxis(glm::vec3 axis_) { axis = glm::normalize(axis_); }
+};
+
 class EngineObject {
 public:
 	glm::vec3 position = glm::vec3{ 0.f };
 	glm::vec3 scale = glm::vec3{ 1.f };
 	glm::vec3 color;
 
-	glm::vec3 rotationAxis = glm::vec3{ 0, 1, 0 };
-	float angle = 0;
+	ObjectRotation orientation;
 	
 	EngineObject() {}
 	~EngineObject() {}
@@ -207,39 +247,11 @@ public:
 	
 	// rotation 
 	// -------
-	void setDirection(glm::vec3 direction_) {
-		rotationAxis = glm::normalize(glm::cross(direction_, glm::vec3{ 0, 1, 0 }));
-
-		if (direction_.x == 0 && direction_.y != 0 && direction_.z == 0) {
-			if (direction_.y < 0) {
-				rotationAxis = glm::vec3{ 0, 0, 1 };
-				angle = glm::radians(180.f);
-			}
-			else {
-				rotationAxis = glm::vec3{ 0, 1, 0 };
-				angle = 0;
-			}
-			return;
-		}
-
-		angle = glm::acos(glm::dot(glm::normalize(direction_), glm::vec3{ 0, 1, 0 }));
-		glm::vec3 refVec = glm::normalize(glm::cross(rotationAxis, glm::vec3{ 0, 1, 0 }));
-		
-		if (glm::dot(refVec, direction_) < 0) {
-			angle = -angle;
-		}
-	}
 
 	void pointTo(glm::vec3 point_) {
 		glm::vec3 direction_ = point_ - position;
-		setDirection(direction_);
+		orientation.setDirection(direction_);
 	}
-
-	void rotateAroundAxis(float angle_) { angle += angle_; }
-
-	void setRotationAroundAxis(float angle_) { angle = angle_; }
-	
-	void setRotationAxis(glm::vec3 axis_) { rotationAxis = glm::normalize(axis_); }
 
 	// variables
 	// -------

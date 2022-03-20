@@ -24,16 +24,9 @@ int main() {
     // -----------
     GLFWHandler::init();
     GLFWwindow* window = GLFWHandler::getGLFWWindow(SCR_WIDTH, SCR_HEIGHT, "3D Engine :)");
-    glfwMakeContextCurrent(window);
 
-    // set multisampling amount
-
-    // disable V-Sync
-    glfwSwapInterval(0);
-
-    // load GLAD
-    // -----------
     GLFWHandler::loadGLAD();
+    GLFWHandler::setGLSettings();
 
     // Setup bufferhandler and shaders
     // -----------
@@ -54,73 +47,32 @@ int main() {
         "src/shaders/shader_per_object.geom"
     );
 
-    // initialize openGL settings
-    // -----------
-    GLFWHandler::setGLSettings(); 
-
     // lighting
     // -----------
     DirLightData directionalLight{ glm::vec3(0.6f, 0.6f, 0.6f), glm::vec3(.2f), glm::vec3(.8f)};
     bufferHandler.setDirLight(directionalLight);
 
-    // objects
+    // Objects
     // -----------
-    std::shared_ptr<EngineObject> vehicle = bufferHandler.createObject(objectTypes::MODEL, false, glm::vec3{ 0 }, glm::vec3{ 0.001 });
-    std::shared_ptr<EngineObject> vehicle2 = bufferHandler.createObject(objectTypes::MODEL, false, glm::vec3{ -2 }, glm::vec3{ 0.001 });
-    std::shared_ptr<EngineObject> cube = bufferHandler.createObject(objectTypes::CUBE, true, glm::vec3{ 1 });
 
-    std::shared_ptr<EngineObject> vecX = bufferHandler.createObject(objectTypes::VECTOR, true, glm::vec3{ 0 }, glm::vec3{ 1, 2, 1 }, glm::vec3{ 1, 0, 0 }, glm::vec3{ 1, 0, 0 });
-    std::shared_ptr<EngineObject> vecY = bufferHandler.createObject(objectTypes::VECTOR, true, glm::vec3{ 0 }, glm::vec3{ 1, 2, 1 }, glm::vec3{ 0, 1, 0 }, glm::vec3{ 0, 1, 0 });
-    std::shared_ptr<EngineObject> vecZ = bufferHandler.createObject(objectTypes::VECTOR, true, glm::vec3{ 0 }, glm::vec3{ 1, 2, 1 }, glm::vec3{ 0, 0, 1 }, glm::vec3{ 0, 0, 1 });
-
-    cube->setRotationAxis(glm::vec3{ 1, 1, 1 });
 
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window))
     {
         updateTime();
-        
-        cube->rotateAroundAxis(0.001); bufferHandler.updateEngineObjectMatrix(cube);
+        processInput(window);
 
-
-        // input
-        // -----------
-        std::vector<float> inputs = processInput(window);
-        if (inputs.size() != 0) {
-            if (inputs.size() == 3 && !buttonPressed) {
-
-
-
-            }
-            buttonPressed = true;
-        }
-        else { buttonPressed = false; }
-
-        // render
-        // -----------
         bufferHandler.draw(true);
 
-        // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
-        // -----------
-        int error = glGetError();
-        if (error != 0) {
-            std::cout << "glError: " << error << std::endl;
-        }
-        
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
-    // deallocate buffers
-    // ------------------------------------------------------------------------
     bufferHandler.~BufferHandler();
 
-    // glfw: terminate, clearing all previously allocated GLFW resources.
-    // ------------------------------------------------------------------
     GLFWHandler::terminateGLFW();
     return 0;
 }
-
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------

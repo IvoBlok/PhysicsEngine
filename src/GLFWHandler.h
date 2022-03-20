@@ -75,6 +75,9 @@ private:
 
 	static void setSettings(GLFWwindow* window) {
 		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+		// disable V-Sync
+		glfwSwapInterval(0);
 	}
 };
 

@@ -94,7 +94,7 @@ public:
 		newObjectInfo.color = glm::vec4{ object->color, 0 };
 		newObjectInfo.geometryMatrix = glm::mat4{ 1 };
 	
-		newObjectInfo.geometryMatrix = glm::rotate(newObjectInfo.geometryMatrix, object->angle, object->rotationAxis);
+		newObjectInfo.geometryMatrix = glm::rotate(newObjectInfo.geometryMatrix, object->orientation.angle, object->orientation.axis);
 		newObjectInfo.geometryMatrix = glm::scale(newObjectInfo.geometryMatrix, object->scale);
 
 		// translation
@@ -150,14 +150,14 @@ public:
 		engineObject.color = color;
 		engineObject.position = position;
 		engineObject.scale = scale;
-		engineObject.setDirection(direction);
+		engineObject.orientation.setDirection(direction);
 
 		// set objectinfo struct
 		ObjectInfo_t newObjectInfo;
 		newObjectInfo.color = glm::vec4{ color, 0 };
 		newObjectInfo.geometryMatrix = glm::mat4{ 1 };
 
-		newObjectInfo.geometryMatrix = glm::rotate(newObjectInfo.geometryMatrix, engineObject.angle, engineObject.rotationAxis);
+		newObjectInfo.geometryMatrix = glm::rotate(newObjectInfo.geometryMatrix, engineObject.orientation.angle, engineObject.orientation.axis);
 		newObjectInfo.geometryMatrix = glm::scale(newObjectInfo.geometryMatrix, scale);
 
 		// translation
