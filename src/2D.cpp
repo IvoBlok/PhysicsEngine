@@ -67,7 +67,7 @@ int main() {
         updateTime();
         processInput(window);
 
-        bufferHandler.draw(true);
+        bufferHandler.draw();
 
         glfwSwapBuffers(window);
         glfwPollEvents();

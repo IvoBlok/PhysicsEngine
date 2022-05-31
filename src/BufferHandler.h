@@ -122,13 +122,14 @@ public:
 
 		// draw single objects
 		// ---------
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		updatePerObjectBuffers();
 		glDrawElements(GL_TRIANGLES, (GLsizei)perObjectIndices.size, GL_UNSIGNED_INT, 0);
 
 		// draw instanced objects
 		// ---------
 		instancingShader.use();
-
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		for (size_t i = 0; i < instancingObjectInfoVector.size(); i++)
 		{
 			updateInstancingBuffers(i);
