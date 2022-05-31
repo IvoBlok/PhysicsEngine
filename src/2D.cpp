@@ -57,8 +57,9 @@ int main() {
     // Objects
     // -----------
     std::shared_ptr<EngineObject> vehicle = bufferHandler.createObject(objectTypes::MODEL, false, glm::vec3{ 0 }, glm::vec3{ 0.001 });
+    std::shared_ptr<EngineObject> vehicle2 = bufferHandler.createObject(objectTypes::MODEL, false, glm::vec3{ 1.5,0,0 }, glm::vec3{ 0.001 });
 
-    generateCollisionCubes(bufferHandler, vehicle);
+    generateCollisionCubes(bufferHandler, vehicle, vehicle2);
 
     // render loop
     // -----------

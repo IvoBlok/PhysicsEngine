@@ -6,7 +6,7 @@
 // std
 #include <vector>
 
-void generateCollisionCubes(BufferHandler& bufferHandler, std::shared_ptr<EngineObject> object) {
+void generateCollisionCubes(BufferHandler& bufferHandler, std::shared_ptr<EngineObject> object, std::shared_ptr<EngineObject> secondObject) {
 	if (object->instancedObject) { std::cout << "ERROR: given object can not be run for collision because it is an instanced object; unsupported behaviour" << std::endl; return; }
 	
 	struct BoundaryBox {
@@ -22,7 +22,7 @@ void generateCollisionCubes(BufferHandler& bufferHandler, std::shared_ptr<Engine
 	glm::vec3 minBoundingBoxPoint = glm::vec3{ 0 };
 	glm::vec3 maxBoundingBoxPoint = glm::vec3{ 0 };
 
-	for (int i = object->verticesIndex; i < object->verticesIndex + object->mesh.vertices.size(); i++) {
+	for (int i = object->verticesIndex/3; i < object->verticesIndex/3 + object->mesh.vertices.size(); i++) {
 		// retrieve the vertex
 		glm::vec4 vertex = glm::vec4{
 			bufferHandler.perObjectVertices.data[i * 3],
@@ -54,7 +54,7 @@ void generateCollisionCubes(BufferHandler& bufferHandler, std::shared_ptr<Engine
 	boundaryBoxes[0][0].object = bufferHandler.createObject(
 		objectTypes::CUBE,
 		false,
-		(minBoundingBoxPoint + maxBoundingBoxPoint) / 2.f,
+		(minBoundingBoxPoint + maxBoundingBoxPoint) / 2.f + object->position,
 		boundaryBoxSize,
 		glm::vec3{1, 0, 1}
 	);
@@ -89,9 +89,10 @@ void generateCollisionCubes(BufferHandler& bufferHandler, std::shared_ptr<Engine
 						};
 
 						glm::vec3 newMaxBoundingPoint = newMinBoundingPoint + (currentBoxBoundarySize / (float)LAYER_DIVISION_FACTOR);
-			
+						bool pointInCurrentBoundaryBox = false;
+
 						// check if there are any points from the mesh in the newly defined region...
-						for (int iv = object->verticesIndex; iv < object->verticesIndex + object->mesh.vertices.size(); iv++)
+						for (int iv = object->verticesIndex/3; iv < object->verticesIndex/3 + object->mesh.vertices.size(); iv++)
 						{
 							// retrieve the vertex
 							glm::vec4 vertex = glm::vec4{
@@ -102,12 +103,37 @@ void generateCollisionCubes(BufferHandler& bufferHandler, std::shared_ptr<Engine
 							};
 							// transform it to the effective world position
 							vertex = vertex * bufferHandler.perObjectObjectInfoArray.data[object->objectInfoIndex].geometryMatrix;
+							
 
 							// check whether the point falls inside the current boundary box
 							if (vertex.x <= newMaxBoundingPoint.x && vertex.x >= newMinBoundingPoint.x &&
 								vertex.y <= newMaxBoundingPoint.y && vertex.y >= newMinBoundingPoint.y &&
 								vertex.z <= newMaxBoundingPoint.z && vertex.z >= newMinBoundingPoint.z ) {
 								
+								pointInCurrentBoundaryBox = true;
+								break;
+							}
+						}
+						if (!pointInCurrentBoundaryBox) { break; }
+
+						// check second object...
+						for (int iv = secondObject->verticesIndex / 3; iv < secondObject->verticesIndex / 3 + secondObject->mesh.vertices.size(); iv++)
+						{
+							// retrieve the vertex
+							glm::vec4 vertex = glm::vec4{
+								bufferHandler.perObjectVertices.data[iv * 3],
+								bufferHandler.perObjectVertices.data[iv * 3 + 1],
+								bufferHandler.perObjectVertices.data[iv * 3 + 2],
+								1
+							};
+							// transform it to the effective world position
+							vertex = vertex * bufferHandler.perObjectObjectInfoArray.data[secondObject->objectInfoIndex].geometryMatrix + glm::vec4{secondObject->position, 0};
+
+							// check whether the point falls inside the current boundary box
+							if (vertex.x <= newMaxBoundingPoint.x && vertex.x >= newMinBoundingPoint.x &&
+								vertex.y <= newMaxBoundingPoint.y && vertex.y >= newMinBoundingPoint.y &&
+								vertex.z <= newMaxBoundingPoint.z && vertex.z >= newMinBoundingPoint.z) {
+
 								// generator box
 								boundaryBoxes[l + 1].push_back(BoundaryBox{});
 								boundaryBoxes[l + 1][boundaryBoxes[l + 1].size() - 1].maxPoint = newMaxBoundingPoint;
@@ -116,7 +142,7 @@ void generateCollisionCubes(BufferHandler& bufferHandler, std::shared_ptr<Engine
 									boundaryBoxes[l + 1][boundaryBoxes[l + 1].size() - 1].object = bufferHandler.createObject(
 										objectTypes::CUBE,
 										true,
-										(newMinBoundingPoint + newMaxBoundingPoint) / 2.f,
+										(newMinBoundingPoint + newMaxBoundingPoint) / 2.f + object->position,
 										abs(newMaxBoundingPoint - newMinBoundingPoint),
 										glm::vec3{ randomRange(0, 100) / 100.f, randomRange(0, 100) / 100.f, randomRange(0, 100) / 100.f }
 									);
