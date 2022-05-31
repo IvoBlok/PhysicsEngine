@@ -13,6 +13,8 @@
 
 #include "shaders/Shader.h"
 
+#include "Collision.h"
+
 // std headers
 #include <iostream>
 #include <cmath>
@@ -54,7 +56,9 @@ int main() {
 
     // Objects
     // -----------
+    std::shared_ptr<EngineObject> vehicle = bufferHandler.createObject(objectTypes::MODEL, false, glm::vec3{ 0 }, glm::vec3{ 0.001 });
 
+    generateCollisionCubes(bufferHandler, vehicle);
 
     // render loop
     // -----------

@@ -177,6 +177,7 @@
   <ItemGroup>
     <ClInclude Include="src\BufferHandler.h" />
     <ClInclude Include="src\Camera.h" />
+    <ClInclude Include="src\Collision.h" />
     <ClInclude Include="src\EngineObject.h" />
     <ClInclude Include="src\GLFWHandler.h" />
     <ClInclude Include="src\MathFunctions.h" />

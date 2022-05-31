@@ -113,7 +113,7 @@ public:
 	// complex functions
 	// ---------
 	void draw(bool wireframe = false) {
-		if (wireframe) { glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); }
+		if (wireframe) { glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); } else { glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); }
 
 		// clean old-frame buffers and set the background color
 		// ---------
@@ -127,7 +127,6 @@ public:
 
 		// draw instanced objects
 		// ---------
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		instancingShader.use();
 
 		for (size_t i = 0; i < instancingObjectInfoVector.size(); i++)
@@ -140,17 +139,16 @@ public:
 	};
 
 	std::shared_ptr<EngineObject> createObject(objectTypes type_, bool instancing, glm::vec3 position = glm::vec3{ 0 }, glm::vec3 scale = glm::vec3{ 1 }, glm::vec3 color = glm::vec3{ 1, 1, 1 }, glm::vec3 direction = glm::vec3{ 0, 1, 0 }) {
-		
-		Mesh mesh;
-		if (!instancing || std::find(instancingTypes.begin(), instancingTypes.end(), type_) == instancingTypes.end()) {
-			mesh = getPrimaryShapeMesh(type_);
-		}
 
 		EngineObject engineObject;
 		engineObject.color = color;
 		engineObject.position = position;
 		engineObject.scale = scale;
 		engineObject.orientation.setDirection(direction);
+
+		if (!instancing || std::find(instancingTypes.begin(), instancingTypes.end(), type_) == instancingTypes.end()) {
+			engineObject.mesh = getPrimaryShapeMesh(type_);
+		}
 
 		// set objectinfo struct
 		ObjectInfo_t newObjectInfo;
@@ -175,22 +173,23 @@ public:
 			perObjectVertexLimits[newObjectIndex] = perObjectVertices.size / 3;
 			perObjectVertexLimits[newObjectIndex + 1] = -1; // required so a small optimization in the shader can be made
 
-			for (size_t i = 0; i < mesh.indices.size(); i++)
+			for (size_t i = 0; i < engineObject.mesh.indices.size(); i++)
 			{
-				mesh.indices[i] += perObjectVertices.size / 3;
+				engineObject.mesh.indices[i] += perObjectVertices.size / 3;
 			}
 
 			// set vertices and indices
-			perObjectVertices.addData(mesh.vertices);
-			perObjectIndices.addData(mesh.indices);
+			perObjectVertices.addData(engineObject.mesh.vertices);
+			perObjectIndices.addData(engineObject.mesh.indices);
 
 			perObjectObjectInfoArray.addData(newObjectInfo);
 
 			// create engineobject
 			// -----------
+
 			engineObject.instancedObject = false;
-			engineObject.verticesIndex = newObjectIndex;
-			engineObject.indicesIndex = newObjectIndex;
+			engineObject.verticesIndex = perObjectVertices.size - engineObject.mesh.vertices.size() * 3;
+			engineObject.indicesIndex = perObjectIndices.size - engineObject.mesh.indices.size();
 			engineObject.objectInfoIndex = newObjectIndex;
 			engineObject.engineObjectListIndex = engineObjects.size();
 		}
@@ -217,8 +216,8 @@ public:
 				instancingObjectInfoVector.push_back(dynamicObjectInfoArrayData{});
 
 				// vertex and index data only has to be assigned for the first in the instancing group
-				instancingVerticesVector[instancingGroup].addData(mesh.vertices);
-				instancingIndicesVector[instancingGroup].addData(mesh.indices);
+				instancingVerticesVector[instancingGroup].addData(engineObject.mesh.vertices);
+				instancingIndicesVector[instancingGroup].addData(engineObject.mesh.indices);
 
 				instancingObjectInfoVector[instancingGroup].addData(newObjectInfo);
 				//create bufferobjects
@@ -256,7 +255,7 @@ public:
 		//TODO! IMPLEMENTATION: MOVE ORIGIN TO AVERAGE OF ALL VERTICES
 	}
 
-private:
+//private:
 	// private variables
 	// ---------
 	int frame = 0;														//-> stores the unique index of the frame being worked on
