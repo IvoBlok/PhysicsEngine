@@ -18,6 +18,7 @@
 // std headers
 #include <iostream>
 #include <cmath>
+#include <thread>
 
 bool buttonPressed = false;
 
@@ -35,14 +36,14 @@ int main() {
     BufferHandler bufferHandler{};
     bufferHandler.window = window;
 
-    Shader& instancingShader = bufferHandler.createShader(
+    bufferHandler.createShader(
         true,
         "src/shaders/shader_instancing.vert",
         "src/shaders/shader_instancing.frag",
         "src/shaders/shader_instancing.geom"
     );
 
-    Shader& perObjectShader = bufferHandler.createShader(
+    bufferHandler.createShader(
         false,
         "src/shaders/shader_per_object.vert",
         "src/shaders/shader_per_object.frag",
@@ -50,19 +51,16 @@ int main() {
     );
 
     // lighting
-    // -----------
     DirLightData directionalLight{ glm::vec3(0.6f, 0.6f, 0.6f), glm::vec3(.2f), glm::vec3(.8f)};
     bufferHandler.setDirLight(directionalLight);
 
-    // Objects
-    // -----------
-    std::shared_ptr<EngineObject> vehicle = bufferHandler.createObject(objectTypes::MODEL, false, glm::vec3{ 0 }, glm::vec3{ 0.001 });
-    std::shared_ptr<EngineObject> vehicle2 = bufferHandler.createObject(objectTypes::MODEL, false, glm::vec3{ 1.5,0,0 }, glm::vec3{ 0.001 });
+    auto firstVehicle = bufferHandler.createEngineObject(objectTypes::MODEL, false, glm::vec3{ 0 }, glm::vec3{ 0.001 });
+    auto secondVehicle = bufferHandler.createEngineObject(objectTypes::MODEL, false, glm::vec3{ 2,0,0 }, glm::vec3{ 0.001 });
 
-    generateCollisionCubes(bufferHandler, vehicle, vehicle2);
+    std::cout << "collision check cube map: " << checkCollisionWithRectangleDomains(&bufferHandler, firstVehicle, secondVehicle, true) << std::endl;
+    std::cout << "collision check STD map:  " << checkCollisionWithSTDMap(&bufferHandler, firstVehicle, secondVehicle) << std::endl;
 
     // render loop
-    // -----------
     while (!glfwWindowShouldClose(window))
     {
         updateTime();
@@ -80,7 +78,6 @@ int main() {
 }
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
-// ---------------------------------------------------------------------------------------------------------
 std::vector<float> processInput(GLFWwindow* window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)

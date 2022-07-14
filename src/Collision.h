@@ -5,9 +5,10 @@
 
 // std
 #include <vector>
+#include <map>
 
-void generateCollisionCubes(BufferHandler& bufferHandler, std::shared_ptr<EngineObject> object, std::shared_ptr<EngineObject> secondObject) {
-	if (object->instancedObject) { std::cout << "ERROR: given object can not be run for collision because it is an instanced object; unsupported behaviour" << std::endl; return; }
+bool checkCollisionWithRectangleDomains(BufferHandler* bufferHandler, std::shared_ptr<EngineObject> object, std::shared_ptr<EngineObject> secondObject, bool visualize = false) {
+	if (object->getIsInstanced()) { std::cout << "ERROR: given object can not be run for collision because it is an instanced object; unsupported behaviour" << std::endl; return false; }
 	
 	struct BoundaryBox {
 		std::shared_ptr<EngineObject> object;
@@ -17,7 +18,7 @@ void generateCollisionCubes(BufferHandler& bufferHandler, std::shared_ptr<Engine
 
 	std::vector<std::vector<BoundaryBox>> boundaryBoxes;
 
-#pragma region get rectangular bounding box
+	#pragma region get rectangular bounding box
 
 	glm::vec3 minBoundingBoxPoint = glm::vec3{ 0 };
 	glm::vec3 maxBoundingBoxPoint = glm::vec3{ 0 };
@@ -25,14 +26,14 @@ void generateCollisionCubes(BufferHandler& bufferHandler, std::shared_ptr<Engine
 	for (int i = object->verticesIndex/3; i < object->verticesIndex/3 + object->mesh.vertices.size(); i++) {
 		// retrieve the vertex
 		glm::vec4 vertex = glm::vec4{
-			bufferHandler.perObjectVertices.data[i * 3],
-			bufferHandler.perObjectVertices.data[i * 3 + 1],
-			bufferHandler.perObjectVertices.data[i * 3 + 2],
+			bufferHandler->perObjectVertices.data[i * 3],
+			bufferHandler->perObjectVertices.data[i * 3 + 1],
+			bufferHandler->perObjectVertices.data[i * 3 + 2],
 			1
 		};
 
 		// transform it to the effective world position
-		vertex = vertex * bufferHandler.perObjectObjectInfoArray.data[object->objectInfoIndex].geometryMatrix;
+		vertex = vertex * bufferHandler->perObjectObjectInfoArray.data[object->objectInfoIndex].geometryMatrix;
 
 		// initialize the boundary points with a value that is guaranteed to be within the mesh
 		minBoundingBoxPoint = (minBoundingBoxPoint == glm::vec3{ 0 }) ? vertex : minBoundingBoxPoint;
@@ -51,19 +52,21 @@ void generateCollisionCubes(BufferHandler& bufferHandler, std::shared_ptr<Engine
 
 	boundaryBoxes.push_back(std::vector<BoundaryBox>{});
 	boundaryBoxes[0].push_back(BoundaryBox{});
-	boundaryBoxes[0][0].object = bufferHandler.createObject(
-		objectTypes::CUBE,
-		false,
-		(minBoundingBoxPoint + maxBoundingBoxPoint) / 2.f + object->position,
-		boundaryBoxSize,
-		glm::vec3{1, 0, 1}
-	);
+	if (visualize) {
+		boundaryBoxes[0][0].object = bufferHandler->createEngineObject(
+			objectTypes::CUBE,
+			false,
+			(minBoundingBoxPoint + maxBoundingBoxPoint) / 2.f + object->position,
+			boundaryBoxSize,
+			glm::vec3{ 1, 0, 1 }
+		);
+	}
 	boundaryBoxes[0][0].minPoint = minBoundingBoxPoint;
 	boundaryBoxes[0][0].maxPoint = maxBoundingBoxPoint;
 
-#pragma endregion
+	#pragma endregion
 
-#pragma region block overlaying
+	#pragma region block overlaying
 	const unsigned short MAX_LAYER_DEPTH = 3;
 	const unsigned short LAYER_DIVISION_FACTOR = 2;
 
@@ -96,13 +99,13 @@ void generateCollisionCubes(BufferHandler& bufferHandler, std::shared_ptr<Engine
 						{
 							// retrieve the vertex
 							glm::vec4 vertex = glm::vec4{
-								bufferHandler.perObjectVertices.data[iv * 3],
-								bufferHandler.perObjectVertices.data[iv * 3 + 1],
-								bufferHandler.perObjectVertices.data[iv * 3 + 2],
+								bufferHandler->perObjectVertices.data[iv * 3],
+								bufferHandler->perObjectVertices.data[iv * 3 + 1],
+								bufferHandler->perObjectVertices.data[iv * 3 + 2],
 								1
 							};
 							// transform it to the effective world position
-							vertex = vertex * bufferHandler.perObjectObjectInfoArray.data[object->objectInfoIndex].geometryMatrix;
+							vertex = vertex * bufferHandler->perObjectObjectInfoArray.data[object->objectInfoIndex].geometryMatrix;
 							
 
 							// check whether the point falls inside the current boundary box
@@ -121,13 +124,13 @@ void generateCollisionCubes(BufferHandler& bufferHandler, std::shared_ptr<Engine
 						{
 							// retrieve the vertex
 							glm::vec4 vertex = glm::vec4{
-								bufferHandler.perObjectVertices.data[iv * 3],
-								bufferHandler.perObjectVertices.data[iv * 3 + 1],
-								bufferHandler.perObjectVertices.data[iv * 3 + 2],
+								bufferHandler->perObjectVertices.data[iv * 3],
+								bufferHandler->perObjectVertices.data[iv * 3 + 1],
+								bufferHandler->perObjectVertices.data[iv * 3 + 2],
 								1
 							};
 							// transform it to the effective world position
-							vertex = vertex * bufferHandler.perObjectObjectInfoArray.data[secondObject->objectInfoIndex].geometryMatrix + glm::vec4{secondObject->position, 0};
+							vertex = vertex * bufferHandler->perObjectObjectInfoArray.data[secondObject->objectInfoIndex].geometryMatrix + glm::vec4{secondObject->position, 0};
 
 							// check whether the point falls inside the current boundary box
 							if (vertex.x <= newMaxBoundingPoint.x && vertex.x >= newMinBoundingPoint.x &&
@@ -138,13 +141,13 @@ void generateCollisionCubes(BufferHandler& bufferHandler, std::shared_ptr<Engine
 								boundaryBoxes[l + 1].push_back(BoundaryBox{});
 								boundaryBoxes[l + 1][boundaryBoxes[l + 1].size() - 1].maxPoint = newMaxBoundingPoint;
 								boundaryBoxes[l + 1][boundaryBoxes[l + 1].size() - 1].minPoint = newMinBoundingPoint;
-								if (l == MAX_LAYER_DEPTH - 1) {
-									boundaryBoxes[l + 1][boundaryBoxes[l + 1].size() - 1].object = bufferHandler.createObject(
+								if (l == MAX_LAYER_DEPTH - 1 && visualize) {
+									boundaryBoxes[l + 1][boundaryBoxes[l + 1].size() - 1].object = bufferHandler->createObject(
 										objectTypes::CUBE,
 										true,
 										(newMinBoundingPoint + newMaxBoundingPoint) / 2.f + object->position,
 										abs(newMaxBoundingPoint - newMinBoundingPoint),
-										glm::vec3{ randomRange(0, 100) / 100.f, randomRange(0, 100) / 100.f, randomRange(0, 100) / 100.f }
+										glm::vec3{ 1, 0.2, 0.2 }
 									);
 								}
 								break;
@@ -155,29 +158,44 @@ void generateCollisionCubes(BufferHandler& bufferHandler, std::shared_ptr<Engine
 			}
 		}
 	}
+	#pragma endregion
+
+	return (boundaryBoxes[1].size() > 0);
+}
 
 
+const size_t hashVec3(glm::vec3& k) {
+	std::size_t seed = k.length();
+
+	seed = seed ^ ((int)(k.x * 10000000) + 0x9e3779b9 + (seed << 6) + (seed >> 2));
+	seed = seed ^ ((int)(k.y * 1000000) + 0x9e3779b9 + (seed << 6) + (seed >> 2));
+	seed = seed ^ ((int)(k.z * 100000) + 0x9e3779b9 + (seed << 6) + (seed >> 2));
 
 
-#pragma endregion
+	return seed;
+}
 
+bool checkCollisionWithSTDMap(BufferHandler* bufferHandler, std::shared_ptr<EngineObject> object, std::shared_ptr<EngineObject> secondObject) {
+	std::map<int, int> countMap;
+	int test1 = 0;
+	int test2 = 0;
+	for (int i = object->verticesIndex / 3; i < object->verticesIndex / 3 + object->mesh.vertices.size(); i++) {
+		test1++;
+		glm::vec4 vertex = glm::vec4{ bufferHandler->perObjectVertices.data[i * 3], bufferHandler->perObjectVertices.data[i * 3 + 1], bufferHandler->perObjectVertices.data[i * 3 + 2], 1 };
+		vertex = vertex * bufferHandler->perObjectObjectInfoArray.data[object->objectInfoIndex].geometryMatrix;
+		glm::vec3 vert = glm::vec3{ vertex.x, vertex.y, vertex.z } + object->position;
+		auto result = countMap.insert(std::pair<size_t, int>(hashVec3(vert), 1));
+	}
+	for (int i = secondObject->verticesIndex / 3; i < secondObject->verticesIndex / 3 + secondObject->mesh.vertices.size(); i++) {
+		test2++;
+		glm::vec4 vertex = glm::vec4{ bufferHandler->perObjectVertices.data[i * 3], bufferHandler->perObjectVertices.data[i * 3 + 1], bufferHandler->perObjectVertices.data[i * 3 + 2], 1 };
+		vertex = vertex * bufferHandler->perObjectObjectInfoArray.data[secondObject->objectInfoIndex].geometryMatrix;
+		glm::vec3 vert = glm::vec3{ vertex.x, vertex.y, vertex.z } + secondObject->position;
 
-	/*
-	std::cout << object->indicesIndex << " : " << object->indicesIndex + object->mesh.indices.size() << std::endl;
-	for (int i = object->verticesIndex; i < object->verticesIndex + object->mesh.vertices.size(); i++)
-	{
-		glm::vec4 currentVector = glm::vec4{
-			bufferHandler.perObjectVertices.data[i*3],
-			bufferHandler.perObjectVertices.data[i*3 + 1],
-			bufferHandler.perObjectVertices.data[i*3 + 2],
-			1
-		};
-		currentVector = currentVector * bufferHandler.perObjectObjectInfoArray.data[object->objectInfoIndex].geometryMatrix;
-
-		currentVector.x = round(currentVector.x * 10)/10;
-		currentVector.y = round(currentVector.y * 10)/10;
-		currentVector.z = round(currentVector.z * 10)/10;
-
-		bufferHandler.createObject(objectTypes::CUBE, true, currentVector, glm::vec3{ 0.1 }, glm::vec3{1, 0, 0});
-	}*/
+		auto result = countMap.insert(std::pair<size_t, int>(hashVec3(vert), 1));
+		if (result.second == false) {
+			result.first->second++;
+		}
+	}
+	return false;
 }

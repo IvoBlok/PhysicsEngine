@@ -49,7 +49,7 @@ public:
 		}
 		for (int i = size; i < size + newData.size(); i++)
 		{
-			data[i] = newData[i - size];
+			data[i] = newData[(long long int)(i - size)];
 		}
 
 		size += newData.size();
@@ -81,7 +81,7 @@ public:
 		}
 		for (int i = size; i < size + newData.size(); i++)
 		{
-			data[i] = newData[i - size];
+			data[i] = newData[(long long int)(i - size)];
 		}
 
 		size += newData.size();
@@ -134,7 +134,7 @@ public:
 		}
 		for (int i = size; i < size + newData.size(); i++)
 		{
-			data[i] = newData[i - size];
+			data[i] = newData[(long long int)(i - size)];
 		}
 
 		size += newData.size();
@@ -151,7 +151,7 @@ public:
 
 	}
 
-	void addData(ObjectInfo_t newData) {
+	ObjectInfo_t& addData(ObjectInfo_t newData) {
 		if (size + 1 > capacity) {
 			ObjectInfo_t* placeholder = data;
 
@@ -169,10 +169,11 @@ public:
 		data[size].color = newData.color;
 
 		size++;
+		return data[size];
 	}
 };
 
-class ObjectRotation {
+class ObjectOrientation {
 public:
 	glm::vec3 axis = glm::vec3{ 0, 1, 0 };
 	float angle = 0;
@@ -215,13 +216,62 @@ public:
 	glm::vec3 scale = glm::vec3{ 1.f };
 	glm::vec3 color;
 
-	ObjectRotation orientation;
+	ObjectOrientation orientation;
 	
-	EngineObject() {}
+private:
+	bool isInstanced = false;
+	unsigned int objectInfoIndex = -1;
+	unsigned int verticesIndex = -1;
+	unsigned int indicesIndex = -1;
+	unsigned int engineObjectListIndex = -1;
+
+public:
+	#pragma region getters and setters
+
+	void setIsInstanced(bool isInstanced_) { isInstanced = isInstanced_; }
+	bool getIsInstanced() { return isInstanced; }
+
+	void setObjectInfoIndex(unsigned int value) { objectInfoIndex = value; }
+	unsigned int getObjectInfoIndex() { return objectInfoIndex; }
+
+	void setVerticesIndex(unsigned int value) { verticesIndex = value; }
+	unsigned int getVerticesIndex() { return verticesIndex; }
+
+	void setIndicesIndex(unsigned int value) { indicesIndex = value; }
+	unsigned int getIndicesIndex() { return indicesIndex; }
+
+	void setEngineObjectListIndex(unsigned int value) { engineObjectListIndex = value; }
+	unsigned int getEngineObjectListIndex() { return engineObjectListIndex; }
+
+	#pragma endregion
+
+	EngineObject(
+		glm::vec3 position_ = glm::vec3{ 0.f }, 
+		glm::vec3 scale_ = glm::vec3{ 1.f }, 
+		glm::vec3 color_ = glm::vec3{ 1.f }, 
+		ObjectOrientation orientation_ = ObjectOrientation{}
+	) :
+		position(position_),
+		scale(scale_),
+		color(color_),
+		orientation(orientation_)
+	{}
+	
+	EngineObject(
+		glm::vec3 position_ = glm::vec3{ 0.f },
+		glm::vec3 scale_ = glm::vec3{ 1.f },
+		glm::vec3 color_ = glm::vec3{ 1.f },
+		glm::vec3 direction_ = glm::vec3{ 1.f }
+	) :
+		position(position_),
+		scale(scale_),
+		color(color_)
+	{
+		orientation.setDirection(direction_);
+	}
+
 	~EngineObject() {}
 
-	// translate
-	// -------
 	void moveTo(glm::vec3 position_) {
 		position = position_;
 	}
@@ -230,8 +280,6 @@ public:
 		position += translation_;
 	}
 
-	// scale
-	// -------
 	void scaleBy(glm::vec3 scale_) {
 		scale += scale_;
 	}
@@ -248,21 +296,10 @@ public:
 		scale = glm::vec3{ scale_ };
 	}
 	
-	// rotation 
-	// -------
-
 	void pointTo(glm::vec3 point_) {
 		glm::vec3 direction_ = point_ - position;
 		orientation.setDirection(direction_);
 	}
-
-	// variables
-	// -------
-	bool instancedObject;
-	unsigned int objectInfoIndex = -1;
-	unsigned int verticesIndex = -1;
-	unsigned int indicesIndex = -1;
-	unsigned int engineObjectListIndex = -1;
 };
 
 #endif
