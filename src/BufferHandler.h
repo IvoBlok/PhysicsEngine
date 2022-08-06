@@ -22,20 +22,40 @@ struct BufferObjectGroup {
 	unsigned int uniformBufferObject;
 	unsigned int shaderStorageBufferObject;
 
-	BufferObjectGroup() {
+private:
+	bool buffersBound = false;
+
+public:
+	void generateBuffers(bool genUniformBuffer) {
 		glGenVertexArrays(1, &vertexArrayObject);
 		glGenBuffers(1, &vertexBufferObject);
 		glGenBuffers(1, &elementBufferObject);
 		glGenBuffers(1, &shaderStorageBufferObject);
-		glGenBuffers(1, &uniformBufferObject);
+		if(genUniformBuffer){ glGenBuffers(1, &uniformBufferObject); }
+			
+		buffersBound = false;
+	}
+
+	void generateBuffers(Shader& shader, bool genUniformBuffer = true) {
+		shader.use();
+		generateBuffers(genUniformBuffer);
 	}
 
 	void bindBufferObjectGroup() {
 		glBindVertexArray(vertexArrayObject);
-		glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObject);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBufferObject);
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, shaderStorageBufferObject);
-		glBindBuffer(GL_UNIFORM_BUFFER, uniformBufferObject);
+		if (!buffersBound) {
+			glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObject);
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBufferObject);
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, shaderStorageBufferObject);
+			if(uniformBufferObject != 0) { glBindBuffer(GL_UNIFORM_BUFFER, uniformBufferObject); }
+			
+			buffersBound = true;
+		}
+	}
+
+	void bindBufferObjectGroup(Shader& shader) {
+		shader.use();
+		bindBufferObjectGroup();
 	}
 
 	~BufferObjectGroup() {
@@ -47,15 +67,13 @@ struct BufferObjectGroup {
 	}
 };
 
-// main class
-// --------
 class BufferHandler {
 public:
 	Shader instancingShader;											//-> stores the shader class instance used for rendering instancing 'groups'
 	Shader defaultShader;												//-> stores the shader class instance used for rendering the individual objects
 	GLFWwindow* window;
 
-private:
+//private:
 	int frame = 0;														//-> stores the unique index of the frame being worked on
 	glm::mat4 view;														//-> stores (temporarily) the view matrix
 	glm::mat4 projection;												//-> stores (temporarily) the projection matrix
@@ -78,10 +96,15 @@ private:
 	dynamicObjectInfoArrayData defaultObjectGroupInfo;					//-> stores objectInfo struct for every engineobject in the default group
 
 	BufferObjectGroup defaultBufferObjectGroup;
-	bool UBOInitialized = false;
+	bool isUniformBufferInitialized = false;
+	bool isUniformBufferAssignedToInstancing = false;
 	int defaultObjectGroupVertexLimits[MAX_PER_OBJECTS_COUNT];					//-> stores the starting vertex_IDs for every objects. Is linked to a uniform for the per_object vertex shader
 
 public:
+
+	dynamicFloatArrayData& getDefaultObjectVertices() { return defaultObjectVertices; }
+	dynamicIntArrayData& getDefaultObjectIndices() { return defaultObjectIndices; }
+	dynamicObjectInfoArrayData& getDefaultObjectGroupInfo() { return defaultObjectGroupInfo; }
 
 	~BufferHandler() {
 		// delete vertex/index/objectinfo data
@@ -101,12 +124,15 @@ public:
 			fragmentPath = "../" + fragmentPath;
 			geometryPath = "../" + geometryPath;
 		}
+
 		if (instancing) {
 			instancingShader = Shader{ vertexPath.c_str(), fragmentPath.c_str(), geometryPath.c_str() };
 			return instancingShader;
 		}
 		else {
 			defaultShader = Shader{ vertexPath.c_str(), fragmentPath.c_str(), geometryPath.c_str() };
+			defaultBufferObjectGroup.generateBuffers(defaultShader);
+			defaultBufferObjectGroup.bindBufferObjectGroup();
 			return defaultShader;
 		}
 	};
@@ -136,28 +162,30 @@ public:
 		if (wireframe) { glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); } else { glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); }
 
 		// clean old-frame buffers and set the background color
-		// ---------
 		glClearColor(backgroundColor[0], backgroundColor[1], backgroundColor[2], backgroundColor[3]);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		// draw single objects
-		// ---------
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		updateDefaultBuffers();
 		updateDefaultBuffers();
 		glDrawElements(GL_TRIANGLES, (GLsizei)defaultObjectIndices.size, GL_UNSIGNED_INT, 0);
 
+		drawInstancingObjects();
+		frame++;
+	};
+
+	void drawInstancingObjects() {
+
 		// draw instanced objects
-		// ---------
 		instancingShader.use();
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
 		for (size_t i = 0; i < instancingObjectInfoVector.size(); i++)
 		{
 			updateInstancingBuffers(i);
-			glDrawElementsInstanced(GL_TRIANGLES, (GLsizei)instancingIndicesVector[i].size, GL_UNSIGNED_INT, 0, (GLsizei)instancingObjectInfoVector[i].size );
+			updateInstancingBuffers(i);
+			glDrawElementsInstanced(GL_TRIANGLES, (GLsizei)instancingIndicesVector[i].size, GL_UNSIGNED_INT, 0, (GLsizei)instancingObjectInfoVector[i].size);
 		}
-
-		frame++;
-	};
+	}
 
 	void initEngineObjectReferences(EngineObject& engineObject, bool instancing, int verticesIndex, int indicesIndex, int objectInfoIndex, int engineObjectListIndex) {
 		engineObject.setIsInstanced(instancing);
@@ -174,7 +202,7 @@ public:
 			defaultObjectVertices.size - engineObject.mesh.vertices.size() * 3,
 			defaultObjectIndices.size - engineObject.mesh.indices.size(),
 			defaultObjectGroupInfo.size - 1,
-			engineObjects.size() - 1
+			engineObjects.size()
 		);
 	}
 
@@ -185,7 +213,7 @@ public:
 			instancingGroup,
 			instancingGroup,
 			instancingObjectInfoVector[instancingGroup].size - 1,
-			engineObjects.size() - 1
+			engineObjects.size() // removed -1, not sure why I had it. Assuming the push to engineobjects list is after this is called. IK it's bad
 		);
 	}
 
@@ -251,6 +279,7 @@ public:
 				instancingIndicesVector.back().addData(newEngineObject.mesh.indices);
 				
 				instancingBufferObjectGroup.push_back(BufferObjectGroup{});
+				instancingBufferObjectGroup.back().generateBuffers(instancingShader, false);
 			}
 			instancingObjectInfoVector[instancingGroup].addData(newEngineObjectInfo);
 
@@ -261,10 +290,6 @@ public:
 		return engineObjects.back();
 	}
 
-	void moveObjectOriginToAvg(std::shared_ptr<EngineObject> object) {
-		//TODO! IMPLEMENTATION: MOVE ORIGIN TO AVERAGE OF ALL VERTICES
-	}
-
 	void setDirLight(DirLightData directionalLight) {
 		defaultShader.use();
 		defaultShader.setDirLight(directionalLight);
@@ -273,7 +298,7 @@ public:
 		instancingShader.setDirLight(directionalLight);
 	}
 
-private:
+//private:
 
 	Mesh getPrimaryShapeMesh(objectTypes type) {
 		if (type == objectTypes::CUBE) {
@@ -329,17 +354,10 @@ private:
 		}
 	}
 
-	void bindBufferObjectGroup(BufferObjectGroup BufferObjectGroup) {
-		glBindVertexArray(BufferObjectGroup.vertexArrayObject);
-		glBindBuffer(GL_ARRAY_BUFFER, BufferObjectGroup.vertexBufferObject);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, BufferObjectGroup.elementBufferObject);
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, BufferObjectGroup.shaderStorageBufferObject);
-		glBindBuffer(GL_UNIFORM_BUFFER, BufferObjectGroup.uniformBufferObject);
-	}
-
 	void initDefaultBufferObjectGroup() {
-		if (UBOInitialized) { return; }
-		defaultShader.use();
+		if (isUniformBufferInitialized) { return; }
+
+		defaultBufferObjectGroup.bindBufferObjectGroup(defaultShader);
 
 		GLuint matricesShaderIndex = glGetUniformBlockIndex(defaultShader.ID, "Matrices");
 		if (matricesShaderIndex < 0) { std::cout << "unfiromblockindexmatrices not found ..." << std::endl; return; }
@@ -350,10 +368,10 @@ private:
 		glBufferData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), NULL, GL_STATIC_DRAW);
 		// define the range of the buffer that links to a uniform binding point
 		glBindBufferRange(GL_UNIFORM_BUFFER, 0, defaultBufferObjectGroup.uniformBufferObject, 0, 2 * sizeof(glm::mat4));
-		UBOInitialized = true;
+		isUniformBufferInitialized = true;
 	}
 
-	void updateUniformBuffer(BufferObjectGroup bufferObjectGroup) {
+	void updateUniformBuffer() {
 		int width, height;
 		glfwGetWindowSize(window, &width, &height);
 		projection = glm::perspective(glm::radians(camera.Zoom), (float)width / (float)height, 0.1f, 100.0f);
@@ -365,18 +383,17 @@ private:
 	
 	void updateDefaultBuffers() {
 
-		defaultShader.use();
-		bindBufferObjectGroup(defaultBufferObjectGroup);
+		defaultBufferObjectGroup.bindBufferObjectGroup(defaultShader);
 		initDefaultBufferObjectGroup();
 
 		// make sure there is the appropriate amount of memory reserved
 		glBufferData(GL_ARRAY_BUFFER, sizeof(float) * defaultObjectVertices.size, defaultObjectVertices.data, GL_STATIC_DRAW);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * defaultObjectIndices.size, defaultObjectIndices.data, GL_STATIC_DRAW);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * defaultObjectIndices.size, defaultObjectIndices.data, GL_DYNAMIC_DRAW);
 		glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(ObjectInfo_t) * defaultObjectGroupInfo.size, defaultObjectGroupInfo.data, GL_DYNAMIC_COPY);
 		
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, defaultBufferObjectGroup.shaderStorageBufferObject);
 
-		updateUniformBuffer(defaultBufferObjectGroup);
+		updateUniformBuffer();
 
 		defaultShader.setIntArr("vertexLimits", defaultObjectGroupVertexLimits);
 
@@ -386,22 +403,24 @@ private:
 
 	void updateInstancingBuffers(unsigned int instancingGroupIndex) {
 		// setup
+		instancingBufferObjectGroup[instancingGroupIndex].bindBufferObjectGroup(instancingShader);
 		initDefaultBufferObjectGroup();
-		instancingBufferObjectGroup[instancingGroupIndex].uniformBufferObject = defaultBufferObjectGroup.uniformBufferObject;
+
+		if (!isUniformBufferAssignedToInstancing) {
+			//instancingBufferObjectGroup[instancingGroupIndex].replaceUniformBuffer(defaultBufferObjectGroup.uniformBufferObject);
+			isUniformBufferAssignedToInstancing = true;
+		}
 		// all rendering groups use the same uniform buffer object, so the instancing bufferobjectgroups just contain a reference to the unique one
-
-		instancingShader.use();
-		bindBufferObjectGroup(instancingBufferObjectGroup[instancingGroupIndex]);
-
 
 		glBufferData(GL_ARRAY_BUFFER, sizeof(float) * instancingVerticesVector[instancingGroupIndex].size, instancingVerticesVector[instancingGroupIndex].data, GL_STATIC_DRAW);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * instancingIndicesVector[instancingGroupIndex].size, instancingIndicesVector[instancingGroupIndex].data, GL_STATIC_DRAW);
 		glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(ObjectInfo_t) * instancingObjectInfoVector[instancingGroupIndex].size, instancingObjectInfoVector[instancingGroupIndex].data, GL_DYNAMIC_COPY);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, instancingBufferObjectGroup[instancingGroupIndex].shaderStorageBufferObject);
 
+		updateUniformBuffer();
+
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 		glEnableVertexAttribArray(0);
 	}
 };
-
 #endif

@@ -300,6 +300,10 @@ public:
 		glm::vec3 direction_ = point_ - position;
 		orientation.setDirection(direction_);
 	}
+
+	void moveObjectOriginToAvg(std::shared_ptr<EngineObject> object) {
+		//TODO! IMPLEMENTATION: MOVE ORIGIN TO AVERAGE OF ALL VERTICES
+	}
 };
 
 #endif
