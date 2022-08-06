@@ -73,35 +73,31 @@ public:
 	Shader defaultShader;												//-> stores the shader class instance used for rendering the individual objects
 	GLFWwindow* window;
 
-//private:
-	int frame = 0;														//-> stores the unique index of the frame being worked on
+private:
+	unsigned int frame = 0;														//-> stores the unique index of the frame being worked on
 	glm::mat4 view;														//-> stores (temporarily) the view matrix
 	glm::mat4 projection;												//-> stores (temporarily) the projection matrix
 	std::vector<std::shared_ptr<EngineObject>> engineObjects;			//-> stores all existing loaded engine objects in the scene
 
-	// instancing variables
 	// ---------
 	std::vector<objectTypes> instancingTypes;							//-> stores the object types that will be rendered by instancing
 
 	std::vector<dynamicFloatArrayData> instancingVerticesVector;		//-> stores per instancing group the vertices, the count and capacity
 	std::vector<dynamicIntArrayData> instancingIndicesVector;			//-> stores per instancing group the indices, the count and capacity
 	std::vector<dynamicObjectInfoArrayData> instancingObjectInfoVector;	//-> stores per instancing group the objectInfo structs
-
 	std::vector<BufferObjectGroup> instancingBufferObjectGroup;
 
-	// default objectgroup variables
 	// ---------
 	dynamicFloatArrayData defaultObjectVertices;						//-> stores default objectgroup vertices, the count and capacity
 	dynamicIntArrayData defaultObjectIndices;							//-> stores default objectgroup indices, the count and capacity
 	dynamicObjectInfoArrayData defaultObjectGroupInfo;					//-> stores objectInfo struct for every engineobject in the default group
-
 	BufferObjectGroup defaultBufferObjectGroup;
-	bool isUniformBufferInitialized = false;
-	bool isUniformBufferAssignedToInstancing = false;
+	
 	int defaultObjectGroupVertexLimits[MAX_PER_OBJECTS_COUNT];					//-> stores the starting vertex_IDs for every objects. Is linked to a uniform for the per_object vertex shader
 
-public:
+	bool isUniformBufferInitialized = false;
 
+public:
 	dynamicFloatArrayData& getDefaultObjectVertices() { return defaultObjectVertices; }
 	dynamicIntArrayData& getDefaultObjectIndices() { return defaultObjectIndices; }
 	dynamicObjectInfoArrayData& getDefaultObjectGroupInfo() { return defaultObjectGroupInfo; }
@@ -161,11 +157,12 @@ public:
 	void draw(bool wireframe = false) {
 		if (wireframe) { glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); } else { glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); }
 
-		// clean old-frame buffers and set the background color
 		glClearColor(backgroundColor[0], backgroundColor[1], backgroundColor[2], backgroundColor[3]);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		// draw single objects
+		initDefaultBufferObjectGroup();
+
+		// please don't ask me why this needs to be called, I just know it works!
 		updateDefaultBuffers();
 		updateDefaultBuffers();
 		glDrawElements(GL_TRIANGLES, (GLsizei)defaultObjectIndices.size, GL_UNSIGNED_INT, 0);
@@ -175,15 +172,20 @@ public:
 	};
 
 	void drawInstancingObjects() {
-
-		// draw instanced objects
 		instancingShader.use();
-
 		for (size_t i = 0; i < instancingObjectInfoVector.size(); i++)
 		{
+			// please don't ask me why this needs to be called, I just know it works!
 			updateInstancingBuffers(i);
 			updateInstancingBuffers(i);
-			glDrawElementsInstanced(GL_TRIANGLES, (GLsizei)instancingIndicesVector[i].size, GL_UNSIGNED_INT, 0, (GLsizei)instancingObjectInfoVector[i].size);
+			
+			glDrawElementsInstanced(
+				GL_TRIANGLES, 
+				(GLsizei)instancingIndicesVector[i].size, 
+				GL_UNSIGNED_INT, 
+				0, 
+				(GLsizei)instancingObjectInfoVector[i].size
+			);
 		}
 	}
 
@@ -298,7 +300,7 @@ public:
 		instancingShader.setDirLight(directionalLight);
 	}
 
-//private:
+private:
 
 	Mesh getPrimaryShapeMesh(objectTypes type) {
 		if (type == objectTypes::CUBE) {
@@ -384,7 +386,6 @@ public:
 	void updateDefaultBuffers() {
 
 		defaultBufferObjectGroup.bindBufferObjectGroup(defaultShader);
-		initDefaultBufferObjectGroup();
 
 		// make sure there is the appropriate amount of memory reserved
 		glBufferData(GL_ARRAY_BUFFER, sizeof(float) * defaultObjectVertices.size, defaultObjectVertices.data, GL_STATIC_DRAW);
@@ -404,12 +405,7 @@ public:
 	void updateInstancingBuffers(unsigned int instancingGroupIndex) {
 		// setup
 		instancingBufferObjectGroup[instancingGroupIndex].bindBufferObjectGroup(instancingShader);
-		initDefaultBufferObjectGroup();
 
-		if (!isUniformBufferAssignedToInstancing) {
-			//instancingBufferObjectGroup[instancingGroupIndex].replaceUniformBuffer(defaultBufferObjectGroup.uniformBufferObject);
-			isUniformBufferAssignedToInstancing = true;
-		}
 		// all rendering groups use the same uniform buffer object, so the instancing bufferobjectgroups just contain a reference to the unique one
 
 		glBufferData(GL_ARRAY_BUFFER, sizeof(float) * instancingVerticesVector[instancingGroupIndex].size, instancingVerticesVector[instancingGroupIndex].data, GL_STATIC_DRAW);

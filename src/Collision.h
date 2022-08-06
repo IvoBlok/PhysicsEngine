@@ -7,6 +7,8 @@
 #include <vector>
 #include <map>
 
+//TODO: Add support for line intersecting. If a line of the other object passes through the currently checked rectangle, it also represents a collision. Not just points.
+
 bool checkCollisionWithRectangleDomains(BufferHandler* bufferHandler, std::shared_ptr<EngineObject> object, std::shared_ptr<EngineObject> secondObject, bool visualize = false) {
 	if (object->getIsInstanced()) { std::cout << "ERROR: given object can not be run for collision because it is an instanced object; unsupported behaviour" << std::endl; return false; }
 	
@@ -15,20 +17,16 @@ bool checkCollisionWithRectangleDomains(BufferHandler* bufferHandler, std::share
 		glm::vec3 minPoint;
 		glm::vec3 maxPoint;
 	};
-
 	std::vector<std::vector<BoundaryBox>> boundaryBoxes;
 
 	#pragma region get rectangular bounding box
-
 	glm::vec3 minBoundingBoxPoint = glm::vec3{ 0 };
 	glm::vec3 maxBoundingBoxPoint = glm::vec3{ 0 };
 
-	for (int i = object->getVerticesIndex()/3; i < object->getVerticesIndex() /3 + object->mesh.vertices.size(); i++) {
+	for (int i = 0; i < object->mesh.vertices.size(); i++) {
 		// retrieve the vertex
 		glm::vec4 vertex = glm::vec4{
-			bufferHandler->getDefaultObjectVertices().data[i * 3],
-			bufferHandler->getDefaultObjectVertices().data[i * 3 + 1],
-			bufferHandler->getDefaultObjectVertices().data[i * 3 + 2],
+			object->mesh.vertices[i],
 			1
 		};
 
@@ -40,13 +38,11 @@ bool checkCollisionWithRectangleDomains(BufferHandler* bufferHandler, std::share
 		maxBoundingBoxPoint = (maxBoundingBoxPoint == glm::vec3{ 0 }) ? vertex : maxBoundingBoxPoint;
 
 		// check whether the point falls outside the current boundary box
-		if (vertex.x > maxBoundingBoxPoint.x) { maxBoundingBoxPoint.x = vertex.x; }
-		if (vertex.y > maxBoundingBoxPoint.y) { maxBoundingBoxPoint.y = vertex.y; }
-		if (vertex.z > maxBoundingBoxPoint.z) { maxBoundingBoxPoint.z = vertex.z; }
-
-		if (vertex.x < minBoundingBoxPoint.x) { minBoundingBoxPoint.x = vertex.x; }
-		if (vertex.y < minBoundingBoxPoint.y) { minBoundingBoxPoint.y = vertex.y; }
-		if (vertex.z < minBoundingBoxPoint.z) { minBoundingBoxPoint.z = vertex.z; }
+		for (int axis = 0; axis < 3; axis++)
+		{
+			if (vertex[axis] > maxBoundingBoxPoint[axis]) { maxBoundingBoxPoint[axis] = vertex[axis]; }
+			if (vertex[axis] < minBoundingBoxPoint[axis]) { minBoundingBoxPoint[axis] = vertex[axis]; }
+		}
 	}
 	glm::vec3 boundaryBoxSize = abs(maxBoundingBoxPoint - minBoundingBoxPoint);
 
@@ -63,12 +59,11 @@ bool checkCollisionWithRectangleDomains(BufferHandler* bufferHandler, std::share
 	}
 	boundaryBoxes[0][0].minPoint = minBoundingBoxPoint;
 	boundaryBoxes[0][0].maxPoint = maxBoundingBoxPoint;
-
 	#pragma endregion
 
 	#pragma region block overlaying
-	const unsigned short MAX_LAYER_DEPTH = 3;
-	const unsigned short LAYER_DIVISION_FACTOR = 2;
+	const unsigned short MAX_LAYER_DEPTH = 4;
+	const unsigned short LAYER_DIVISION_FACTOR = 3;
 
 	for (int l = 0; l < MAX_LAYER_DEPTH; l++)
 	{
@@ -99,9 +94,7 @@ bool checkCollisionWithRectangleDomains(BufferHandler* bufferHandler, std::share
 						{
 							// retrieve the vertex
 							glm::vec4 vertex = glm::vec4{
-								bufferHandler->getDefaultObjectVertices().data[iv * 3],
-								bufferHandler->getDefaultObjectVertices().data[iv * 3 + 1],
-								bufferHandler->getDefaultObjectVertices().data[iv * 3 + 2],
+								object->mesh.vertices[iv],
 								1
 							};
 							// transform it to the effective world position
@@ -163,7 +156,6 @@ bool checkCollisionWithRectangleDomains(BufferHandler* bufferHandler, std::share
 	return (boundaryBoxes[1].size() > 0);
 }
 
-
 const size_t hashVec3(glm::vec3& k) {
 	std::size_t seed = k.length();
 
@@ -177,22 +169,17 @@ const size_t hashVec3(glm::vec3& k) {
 
 bool checkCollisionWithSTDMap(BufferHandler* bufferHandler, std::shared_ptr<EngineObject> object, std::shared_ptr<EngineObject> secondObject) {
 	std::map<int, int> countMap;
-	int test1 = 0;
-	int test2 = 0;
-	for (int i = object->getVerticesIndex() / 3; i < object->getVerticesIndex() / 3 + object->mesh.vertices.size(); i++) {
-		test1++;
-		glm::vec4 vertex = glm::vec4{ bufferHandler->getDefaultObjectVertices().data[i * 3], bufferHandler->getDefaultObjectVertices().data[i * 3 + 1], bufferHandler->getDefaultObjectVertices().data[i * 3 + 2], 1 };
-		vertex = vertex * bufferHandler->getDefaultObjectGroupInfo().data[object->getObjectInfoIndex()].geometryMatrix;
-		glm::vec3 vert = glm::vec3{ vertex.x, vertex.y, vertex.z } + object->position;
-		auto result = countMap.insert(std::pair<size_t, int>(hashVec3(vert), 1));
-	}
-	for (int i = secondObject->getVerticesIndex() / 3; i < secondObject->getVerticesIndex() / 3 + secondObject->mesh.vertices.size(); i++) {
-		test2++;
-		glm::vec4 vertex = glm::vec4{ bufferHandler->getDefaultObjectVertices().data[i * 3], bufferHandler->getDefaultObjectVertices().data[i * 3 + 1], bufferHandler->getDefaultObjectVertices().data[i * 3 + 2], 1 };
-		vertex = vertex * bufferHandler->getDefaultObjectGroupInfo().data[secondObject->getObjectInfoIndex()].geometryMatrix;
-		glm::vec3 vert = glm::vec3{ vertex.x, vertex.y, vertex.z } + secondObject->position;
+	for (int i = 0; i < object->mesh.vertices.size(); i++) {
+		glm::vec3 vertex = glm::vec4{ object->mesh.vertices[i],1 } *bufferHandler->getDefaultObjectGroupInfo().data[object->getObjectInfoIndex()].geometryMatrix;
+		vertex += object->position;
 
-		auto result = countMap.insert(std::pair<size_t, int>(hashVec3(vert), 1));
+		auto result = countMap.insert(std::pair<size_t, int>(hashVec3(vertex), 1));
+	}
+	for (int i = 0; i < secondObject->mesh.vertices.size(); i++) {
+		glm::vec3 vertex = glm::vec4{ secondObject->mesh.vertices[i],1 } *bufferHandler->getDefaultObjectGroupInfo().data[secondObject->getObjectInfoIndex()].geometryMatrix;
+		vertex += secondObject->position;
+
+		auto result = countMap.insert(std::pair<size_t, int>(hashVec3(vertex), 1));
 		if (result.second == false) {
 			result.first->second++;
 		}

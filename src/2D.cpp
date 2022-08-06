@@ -55,31 +55,16 @@ int main() {
     bufferHandler.setDirLight(directionalLight);
 
     auto firstVehicle = bufferHandler.createEngineObject(objectTypes::MODEL, false, glm::vec3{ 0 }, glm::vec3{ 0.001 });
-    auto secondVehicle = bufferHandler.createEngineObject(objectTypes::MODEL, false, glm::vec3{ 2,0,0 }, glm::vec3{ 0.001 });
+    auto secondVehicle = bufferHandler.createEngineObject(objectTypes::MODEL, false, glm::vec3{ 1,0,0 }, glm::vec3{ 0.001 });
     
-    //auto cube = bufferHandler.createEngineObject(objectTypes::CUBE, true, glm::vec3{ 0,0,2 }, glm::vec3{ 1 }, glm::vec3{0.5, 1, 0.5});
-
-    for (size_t i = 0; i < 50; i++)
-    {
-        bufferHandler.createEngineObject(objectTypes::CUBE, true, glm::vec3{ randomRange(-5, 5), randomRange(-5, 5), randomRange(-5, 5) });
-    }
-    
-    //std::cout << "collision check cube map: " << checkCollisionWithRectangleDomains(&bufferHandler, firstVehicle, secondVehicle, true) << std::endl;
-    //std::cout << "collision check STD map:  " << checkCollisionWithSTDMap(&bufferHandler, firstVehicle, secondVehicle) << std::endl;
+    std::cout << "collision check cube map: " << checkCollisionWithRectangleDomains(&bufferHandler, firstVehicle, secondVehicle, true) << std::endl;
 
     // render loop
     while (!glfwWindowShouldClose(window))
     {
         updateTime();
-        std::vector<float> result = processInput(window);
-        if (result.size() == 1 && result[0] == -1) {
-            
-            for (size_t i = 0; i < bufferHandler.instancingObjectInfoVector.size(); i++)
-            {
-                bufferHandler.updateInstancingBuffers(i);
-                //glDrawElementsInstanced(GL_TRIANGLES, (GLsizei)bufferHandler.instancingIndicesVector[i].size, GL_UNSIGNED_INT, 0, (GLsizei)bufferHandler.instancingObjectInfoVector[i].size);
-            }
-        }
+        processInput(window);
+ 
         bufferHandler.draw(true);
 
         glfwSwapBuffers(window);
