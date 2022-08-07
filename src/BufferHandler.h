@@ -232,6 +232,17 @@ public:
 		objectInfo.geometryMatrix[3][2] = engineObject.position.z;
 	}
 
+	void updateObjectVertices(std::shared_ptr<EngineObject> object) {
+		if (!object->getIsInstanced()) {
+			for (size_t i = 0; i < object->mesh.vertices.size(); i++)
+			{
+				defaultObjectVertices.data[object->getVerticesIndex() + 3 * i] = object->mesh.vertices[i].x;
+				defaultObjectVertices.data[object->getVerticesIndex() + 3 * i + 1] = object->mesh.vertices[i].y;
+				defaultObjectVertices.data[object->getVerticesIndex() + 3 * i + 2] = object->mesh.vertices[i].z;
+			}
+		}
+	}
+
 	std::shared_ptr<EngineObject> createEngineObject(objectTypes objectType, bool instancing, glm::vec3 position = glm::vec3{ 0 }, glm::vec3 scale = glm::vec3{ 1 }, glm::vec3 color = glm::vec3{ 1, 1, 1 }, glm::vec3 direction = glm::vec3{ 0, 1, 0 }) {
 
 		EngineObject newEngineObject{position, scale, color, direction};
