@@ -14,6 +14,7 @@
 #include "shaders/Shader.h"
 
 #include "Collision.h"
+#include "PerlinNoise.h"
 
 // std headers
 #include <iostream>
@@ -54,10 +55,16 @@ int main() {
     DirLightData directionalLight{ glm::vec3(0.6f, 0.6f, 0.6f), glm::vec3(.2f), glm::vec3(.8f)};
     bufferHandler.setDirLight(directionalLight);
 
-    auto firstVehicle = bufferHandler.createEngineObject(objectTypes::MODEL, false, glm::vec3{ 0 }, glm::vec3{ 0.001 });
-    auto secondVehicle = bufferHandler.createEngineObject(objectTypes::MODEL, false, glm::vec3{ 1,0,0 }, glm::vec3{ 0.001 });
-    
-    std::cout << "collision check cube map: " << checkCollisionWithRectangleDomains(&bufferHandler, firstVehicle, secondVehicle, true) << std::endl;
+    // object creation
+    auto grid = bufferHandler.createEngineObject(objectTypes::GRID, false, glm::vec3{ 0 }, glm::vec3{ 0.5 });
+    grid->pointTo(glm::vec3{ 0, 0, -1 });
+    bufferHandler.updateEngineObjectMatrix(grid);
+
+    for (size_t i = 0; i < grid->mesh.vertices.size(); i++)
+    {
+        grid->mesh.vertices[i].z += layeredPerlin(grid->mesh.vertices[i].x, grid->mesh.vertices[i].y, std::vector<float>{1.f, 5.f, 20.f}, std::vector<float>{.3f, .8f, 5.f});
+        bufferHandler.getDefaultObjectVertices().data[grid->getVerticesIndex() + 3 * i + 2] = grid->mesh.vertices[i].z;
+    }
 
     // render loop
     while (!glfwWindowShouldClose(window))
@@ -65,7 +72,7 @@ int main() {
         updateTime();
         processInput(window);
  
-        bufferHandler.draw(true);
+        bufferHandler.draw(false);
 
         glfwSwapBuffers(window);
         glfwPollEvents();

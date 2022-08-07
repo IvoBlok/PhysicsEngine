@@ -340,15 +340,22 @@ private:
 
 			return mesh;
 		}
-		if (type == objectTypes::VECTOR) {
+		else if (type == objectTypes::VECTOR) {
 			std::string path = "src/external/models/vector.stl";
 			if (ExternalDebug) { path = "../" + path; }
 
 			Mesh mesh{ path };
 			return mesh;
 		}
-		if (type == objectTypes::MODEL) {
+		else if (type == objectTypes::MODEL) {
 			std::string path = "src/external/models/SolarCarTestModel.stl";
+			if (ExternalDebug) { path = "../" + path; }
+
+			Mesh mesh{ path };
+			return mesh;
+		}
+		else if (type == objectTypes::GRID) {
+			std::string path = "src/external/models/grid.stl";
 			if (ExternalDebug) { path = "../" + path; }
 
 			Mesh mesh{ path };

@@ -11,7 +11,8 @@
 enum objectTypes {
 	CUBE,
 	VECTOR,
-	MODEL
+	MODEL,
+	GRID
 };
 
 struct Vector3D {

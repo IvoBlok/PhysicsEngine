@@ -182,6 +182,7 @@
     <ClInclude Include="src\GLFWHandler.h" />
     <ClInclude Include="src\MathFunctions.h" />
     <ClInclude Include="src\Mesh.h" />
+    <ClInclude Include="src\PerlinNoise.h" />
     <ClInclude Include="src\settings.h" />
     <ClInclude Include="src\shaders\Shader.h" />
     <ClInclude Include="src\TimeHandler.h" />
