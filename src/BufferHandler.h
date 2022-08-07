@@ -241,6 +241,9 @@ public:
 				defaultObjectVertices.data[object->getVerticesIndex() + 3 * i + 2] = object->mesh.vertices[i].z;
 			}
 		}
+		else {
+			std::cout << "ERROR: tried to update object vertices of instanced object. This is unsupported behaviour (for now) \n";
+		}
 	}
 
 	std::shared_ptr<EngineObject> createEngineObject(objectTypes objectType, bool instancing, glm::vec3 position = glm::vec3{ 0 }, glm::vec3 scale = glm::vec3{ 1 }, glm::vec3 color = glm::vec3{ 1, 1, 1 }, glm::vec3 direction = glm::vec3{ 0, 1, 0 }) {

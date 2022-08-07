@@ -63,7 +63,7 @@ int main() {
     for (size_t i = 0; i < grid->mesh.vertices.size(); i++)
     {
         grid->mesh.vertices[i].z += layeredPerlin(grid->mesh.vertices[i].x, grid->mesh.vertices[i].y, std::vector<float>{1.f, 5.f, 20.f}, std::vector<float>{.3f, .8f, 5.f});
-        bufferHandler.getDefaultObjectVertices().data[grid->getVerticesIndex() + 3 * i + 2] = grid->mesh.vertices[i].z;
+        bufferHandler.updateObjectVertices(grid);
     }
 
     // render loop
