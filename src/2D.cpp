@@ -13,8 +13,7 @@
 
 #include "shaders/Shader.h"
 
-#include "Collision.h"
-#include "PerlinNoise.h"
+#include "FlowFieldVisualization.h"
 
 // std headers
 #include <iostream>
@@ -22,6 +21,11 @@
 #include <thread>
 
 bool buttonPressed = false;
+
+glm::vec3 velocityField(glm::vec3 position) {
+    return glm::vec3{0, 0.1 * sin(position.x + position.y), 0.1 * cos(position.x - position.y)};
+    //return glm::vec3{ 0, 0, 0.1f };
+}
 
 int main() {
     // glfw window creation
@@ -56,22 +60,16 @@ int main() {
     bufferHandler.setDirLight(directionalLight);
 
     // object creation
-    auto grid = bufferHandler.createEngineObject(objectTypes::GRID, false, glm::vec3{ 0 }, glm::vec3{ 0.5 });
-    grid->pointTo(glm::vec3{ 0, 0, -1 });
-    bufferHandler.updateEngineObjectMatrix(grid);
-
-    for (size_t i = 0; i < grid->mesh.vertices.size(); i++)
-    {
-        grid->mesh.vertices[i].z += layeredPerlin(grid->mesh.vertices[i].x, grid->mesh.vertices[i].y, std::vector<float>{1.f, 5.f, 20.f}, std::vector<float>{.3f, .8f, 5.f});
-        bufferHandler.updateObjectVertices(grid);
-    }
+    auto vehicle = bufferHandler.createEngineObject(objectTypes::MODEL, false, glm::vec3{ 0 }, glm::vec3{ 0.001 });
+    FlowFieldVisualizer visualizer{bufferHandler, vehicle};
 
     // render loop
     while (!glfwWindowShouldClose(window))
     {
         updateTime();
         processInput(window);
- 
+        visualizer.updateVisualization(&velocityField);
+
         bufferHandler.draw(false);
 
         glfwSwapBuffers(window);

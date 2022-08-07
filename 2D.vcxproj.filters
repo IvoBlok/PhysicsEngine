@@ -56,6 +56,9 @@
     <ClInclude Include="src\PerlinNoise.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\FlowFieldVisualization.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="src\shaders\shader_instancing.frag" />

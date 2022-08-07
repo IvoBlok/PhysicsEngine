@@ -9,6 +9,30 @@
 
 //TODO: Add support for line intersecting. If a line of the other object passes through the currently checked rectangle, it also represents a collision. Not just points.
 
+void getBoundaryBox(std::shared_ptr<EngineObject> object, glm::vec3& minPoint, glm::vec3& maxPoint, BufferHandler& bufferHandler) {
+	for (int i = 0; i < object->mesh.vertices.size(); i++) {
+		// retrieve the vertex
+		glm::vec4 vertex = glm::vec4{
+			object->mesh.vertices[i],
+			1
+		};
+
+		// transform it to the effective world position
+		vertex = vertex * bufferHandler.getDefaultObjectGroupInfo().data[object->getObjectInfoIndex()].geometryMatrix;
+
+		// initialize the boundary points with a value that is guaranteed to be within the mesh
+		minPoint = (minPoint == glm::vec3{ 0 }) ? vertex : minPoint;
+		maxPoint = (maxPoint == glm::vec3{ 0 }) ? vertex : maxPoint;
+
+		// check whether the point falls outside the current boundary box
+		for (int axis = 0; axis < 3; axis++)
+		{
+			if (vertex[axis] > maxPoint[axis]) { maxPoint[axis] = vertex[axis]; }
+			if (vertex[axis] < minPoint[axis]) { minPoint[axis] = vertex[axis]; }
+		}
+	}
+}
+
 bool checkCollisionWithRectangleDomains(BufferHandler* bufferHandler, std::shared_ptr<EngineObject> object, std::shared_ptr<EngineObject> secondObject, bool visualize = false) {
 	if (object->getIsInstanced()) { std::cout << "ERROR: given object can not be run for collision because it is an instanced object; unsupported behaviour" << std::endl; return false; }
 	
@@ -23,27 +47,8 @@ bool checkCollisionWithRectangleDomains(BufferHandler* bufferHandler, std::share
 	glm::vec3 minBoundingBoxPoint = glm::vec3{ 0 };
 	glm::vec3 maxBoundingBoxPoint = glm::vec3{ 0 };
 
-	for (int i = 0; i < object->mesh.vertices.size(); i++) {
-		// retrieve the vertex
-		glm::vec4 vertex = glm::vec4{
-			object->mesh.vertices[i],
-			1
-		};
+	getBoundaryBox(object, minBoundingBoxPoint, maxBoundingBoxPoint, *bufferHandler);
 
-		// transform it to the effective world position
-		vertex = vertex * bufferHandler->getDefaultObjectGroupInfo().data[object->getObjectInfoIndex()].geometryMatrix;
-
-		// initialize the boundary points with a value that is guaranteed to be within the mesh
-		minBoundingBoxPoint = (minBoundingBoxPoint == glm::vec3{ 0 }) ? vertex : minBoundingBoxPoint;
-		maxBoundingBoxPoint = (maxBoundingBoxPoint == glm::vec3{ 0 }) ? vertex : maxBoundingBoxPoint;
-
-		// check whether the point falls outside the current boundary box
-		for (int axis = 0; axis < 3; axis++)
-		{
-			if (vertex[axis] > maxBoundingBoxPoint[axis]) { maxBoundingBoxPoint[axis] = vertex[axis]; }
-			if (vertex[axis] < minBoundingBoxPoint[axis]) { minBoundingBoxPoint[axis] = vertex[axis]; }
-		}
-	}
 	glm::vec3 boundaryBoxSize = abs(maxBoundingBoxPoint - minBoundingBoxPoint);
 
 	boundaryBoxes.push_back(std::vector<BoundaryBox>{});
