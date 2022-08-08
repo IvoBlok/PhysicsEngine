@@ -23,8 +23,9 @@
 bool buttonPressed = false;
 
 glm::vec3 velocityField(glm::vec3 position) {
-    return glm::vec3{0, 0.1 * sin(position.x + position.y), 0.1 * cos(position.x - position.y)};
+    //return glm::vec3{0, 0.1 * sin(position.x + position.y), 0.1 * cos(position.x - position.y)};
     //return glm::vec3{ 0, 0, 0.1f };
+    return glm::vec3{ 0.1*sin(position.z * 10 + position.y), 0.05*sin(position.z*10 - 5*position.x*position.y), 0.2f };
 }
 
 int main() {
@@ -68,6 +69,7 @@ int main() {
     {
         updateTime();
         processInput(window);
+
         visualizer.updateVisualization(&velocityField);
 
         bufferHandler.draw(false);
